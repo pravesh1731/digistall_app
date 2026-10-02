@@ -1,0 +1,350 @@
+{
+  "project_info": {
+    "project_number": "43638107391",
+    "project_id": "humans-of-rural-india-d2b22",
+    "storage_bucket": "humans-of-rural-india-d2b22.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:4a8d7c081a3135000bf0ca",
+        "android_client_info": {
+          "package_name": "com.HRI.DigiStall"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "43638107391-46gqo4aoc1668kjt5fa0pinkme5p64di.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "d0b9993c323a2d048ea934b5a9e305fdd17749f6"
+          }
+        },
+        {
+          "client_id": "43638107391-52s6kee1c6t9r4ovdedeecdod310v5fr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "c036b0b77a670ad1f4f0ea19eda2b9811ed986c7"
+          }
+        },
+        {
+          "client_id": "43638107391-c387cr9a32bmcldevrfo8bp4ne16cl0o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "00291d1ca4ee59b6ef1a5c832b081b95511f0250"
+          }
+        },
+        {
+          "client_id": "43638107391-cqglu019558lo8e2mm369pjpvf2iffk0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "7e455b343a2ab8621980e80ad6d982ea5b081223"
+          }
+        },
+        {
+          "client_id": "43638107391-dhm3nfkajq8p702p9e88d7346aflith2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "e7563a1ff0d9e414f0780c908d1a948acdfa5df4"
+          }
+        },
+        {
+          "client_id": "43638107391-kvd2775smm3kiq2dqpfd51kijddruf44.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.HRI.DigiStall",
+            "certificate_hash": "340bcf72435880017d93e288e51b2deba9113f86"
+          }
+        },
+        {
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:4de2595a531830310bf0ca",
+        "android_client_info": {
+          "package_name": "com.digistall.digistall"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "43638107391-h6pajn423pel2u0sgb7duo4gje9r13bh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.digistall",
+            "certificate_hash": "997c66dd3197c5a3e408c53d487586c60eaa88df"
+          }
+        },
+        {
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:09d16774c437bdbc0bf0ca",
+        "android_client_info": {
+          "package_name": "com.digistall.gotan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "43638107391-a5ej1r5hgjnpd0loud5v4072ip628tns.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "5c212538e50beb60a41371df5e790fd8541d0dab"
+          }
+        },
+        {
+          "client_id": "43638107391-ko96oq1mktq040fn72nk7ilff68k6uat.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "b096990a5d2bb14cc7f84ea9e902f5216552e231"
+          }
+        },
+        {
+          "client_id": "43638107391-m0nua0e4viqjkrf3eqm76oci7s2f16vo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "99c93d9a89e617458db7bd3eb7022a8f9012892b"
+          }
+        },
+        {
+          "client_id": "43638107391-n7ptdvh9lh0hgtquu802ttpie4j3143f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "72153f230e274423b9a172a99bd990cc1ebb7056"
+          }
+        },
+        {
+          "client_id": "43638107391-oq6bd591el6s2pr65b5tc6iqc8rjaqff.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "e65d793a3c2fb7b6855f6fd95f538f5dcf6abd2f"
+          }
+        },
+        {
+          "client_id": "43638107391-spv23a1jlotvo5o218iukfc0dnhtmdl0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.gotan",
+            "certificate_hash": "f1562a3bcdf99f9ed0ae0111541a5a81d0764ef1"
+          }
+        },
+        {
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:e8b43666156e3a6e0bf0ca",
+        "android_client_info": {
+          "package_name": "com.digistall.rider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "43638107391-2hel05r8tf25dn7es5r0ieod0bmom0f3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "da883bf0efdae50cd5f4ee78ceccf2a3ecf47d1d"
+          }
+        },
+        {
+          "client_id": "43638107391-8kv5v3oia86st1ljk908it8pjfgq2dc6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "ca36f9c9271d906b5c2362ad788b645ab339871e"
+          }
+        },
+        {
+          "client_id": "43638107391-9cpoq2hg8mh9csmf9e8e7hsq5rphfjht.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "f1562a3bcdf99f9ed0ae0111541a5a81d0764ef1"
+          }
+        },
+        {
+          "client_id": "43638107391-agar8h3mjkpsoalsmsa90uealqeegdjo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "1401197aa2f8f7e334a75936156f9f628b6ccf6a"
+          }
+        },
+        {
+          "client_id": "43638107391-ihnkhtlce28omi75rjh8ckrtufrklf58.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "997c66dd3197c5a3e408c53d487586c60eaa88df"
+          }
+        },
+        {
+          "client_id": "43638107391-m3v95r186lfdds0i64p05v4jnm3aanah.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "751bef9b1d0d4706acd4854826a45e48d5bb417c"
+          }
+        },
+        {
+          "client_id": "43638107391-t9lm310d9qdv05s2v0m3nohrjnlslq5a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digistall.rider",
+            "certificate_hash": "161fb8a92fab50be10dcf7687f69c9589df84b84"
+          }
+        },
+        {
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:086b4f1586a8414b0bf0ca",
+        "android_client_info": {
+          "package_name": "com.rider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
