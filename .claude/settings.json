@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git branch:*\\)                                                                                                                        \r  Bash\\(git checkout:*\\)                                                                                                                      \r  Bash\\(git rm:*\\)                                                                                                                            \r  Bash\\(git add:*\\)                                                                                                                           \r  Bash\\(git commit:*\\)                                                                                                                        \r  Bash\\(git remote:*\\)                                                                                                                        \r  Bash\\(git push:*)"
+    ]
+  }
+}
