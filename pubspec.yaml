@@ -1,5 +1,5 @@
 name: digistall
-description: "A new Flutter project."
+description: "DigiStall seller app: run your digistall.in store from your phone."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.6+10
+version: 2.0.0+11
 
 environment:
   sdk: ^3.7.2
@@ -31,33 +31,24 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  flutter_svg: ^2.2.0
-  lottie: ^3.3.1
   shared_preferences: ^2.5.3
-  image_picker: ^1.1.2
-  path_provider: ^2.1.5
-  path: ^1.9.1
-  permission_handler: ^12.0.1
-  uuid: ^4.2.2
-  #  firebase_app_check: ^0.2.2
-  #  firebase_storage: ^11.0.0
+  http: ^1.6.0
   firebase_core: ^3.14.0
   firebase_auth: ^5.6.0
-  google_sign_in: ^6.3.0
-  sms_autofill: ^2.4.1
   firebase_messaging: ^15.2.10
+  firebase_storage: ^12.4.9
+  google_sign_in: ^6.3.0
   flutter_local_notifications: ^19.4.2
-  timezone: ^0.10.1
+  image_picker: ^1.1.2
+  url_launcher: ^6.3.2
+  share_plus: ^12.0.2
   pdf: ^3.11.3
   printing: ^5.14.2
-  firebase_storage: ^12.4.9
-  #  file_picker: ^6.1.1
-  mime: ^1.0.4
-  url_launcher: ^6.3.2
-  flutter_launcher_icons: ^0.14.4
+  # Store location picker (OpenStreetMap, same as the website)
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +60,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter_icons:
   android: true
@@ -97,10 +89,6 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  assets:
-    - assets/Icons/
-    - assets/animation/
-    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -118,22 +106,23 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
+  # Same typefaces as admin.digistall.in. Hind also covers Hindi.
   fonts:
-    - family: bevan
+    - family: Hind
       fonts:
-        #        - asset: assets/fonts/Bevan-Regular.ttf
-        #        - asset: assets/fonts/CarterOne-Regular.ttf
-        #        - asset: assets/fonts/Newsreader_14pt-Regular.ttf
-        #        - asset: assets/fonts/Newsreader_9pt-ExtraBold.ttf
-        #        - asset: assets/fonts/PTSerif-Bold.ttf
-        #        - asset: assets/fonts/Jost-ExtraBold.ttf
-        #        - asset: assets/fonts/Jost-Black.ttf
-        #        - asset: assets/fonts/Mogra-Regular.ttf
-        - asset: assets/fonts/OrelegaOne-Regular.ttf
-    #         style: italic
-    - family: bold
+        - asset: assets/fonts/Hind-Regular.ttf
+        - asset: assets/fonts/Hind-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Hind-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Hind-Bold.ttf
+          weight: 700
+    - family: Bricolage
       fonts:
-        - asset: assets/fonts/PTSerif-Bold.ttf
+        - asset: assets/fonts/BricolageGrotesque-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
+          weight: 800
 
   # fonts:
   #   - family: Schyler

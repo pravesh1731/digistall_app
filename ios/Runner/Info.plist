@@ -42,6 +42,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of your products, logo and payment QR code.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose photos of your products, logo and payment QR code.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Pin your shop on the map so delivery riders can reach you.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>whatsapp</string>
+		<string>https</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
