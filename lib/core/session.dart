@@ -6,7 +6,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'languages_data.dart';
 import 'models.dart';
+import 'rider.dart';
 
 /// App-wide state: who is signed in, their user record and shop, and the UI
 /// language. Screens listen to it and rebuild when it changes.
@@ -31,6 +33,42 @@ class Session extends ChangeNotifier {
   String get shopId => shop?.shopId ?? (user?['shopId'] as String? ?? '');
   String get userStatus => (user?['userStatus'] as String?) ?? '';
   List<OrderGroup> get orders => OrderGroup.fromRaw(user?['orders']);
+
+  /// Gotan rider deliveries keyed by orderId (latest per order).
+  Map<String, RiderTrip> riders = {};
+
+  Future<Map<String, RiderTrip>> refreshRiders() async {
+    final id = shopId;
+    if (id.isEmpty) return riders;
+    final list = await Api.shopRiderTrips(id);
+    final next = <String, RiderTrip>{};
+    for (final m in list) {
+      final t = RiderTrip(m);
+      if (t.orderId.isEmpty) continue;
+      final prev = next[t.orderId];
+      // Keep the newest record if an order was dispatched more than once.
+      if (prev == null || (t.updatedAt ?? DateTime(2000)).isAfter(prev.updatedAt ?? DateTime(2000))) next[t.orderId] = t;
+    }
+    final changed = jsonEncode(next.map((k, v) => MapEntry(k, v.raw))) != jsonEncode(riders.map((k, v) => MapEntry(k, v.raw)));
+    if (id == shopId) {
+      riders = next;
+      if (changed) notifyListeners();
+    }
+    return riders;
+  }
+
+  /// Order stage including rider progress, same rules as the website:
+  /// rider delivered → delivered, rider picked up / on the way → shipped.
+  String stageOf(OrderGroup o) {
+    final base = o.status;
+    if (base == 'cancel' || base == 'delivered') return base;
+    final t = riders[o.id];
+    if (t != null) {
+      if (t.stage == 'delivered') return 'delivered';
+      if (t.stage == 'picked' || t.stage == 'transit') return 'shipped';
+    }
+    return base;
+  }
 
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
@@ -99,6 +137,11 @@ class Session extends ChangeNotifier {
   Future<void> refreshAll() async {
     await refreshUser();
     await refreshShop();
+    try {
+      await refreshRiders();
+    } catch (_) {
+      // Rider info is optional; the seller backend data is what matters.
+    }
   }
 
   /// Applies a local edit to the cached shop so the UI updates immediately,
@@ -125,6 +168,7 @@ class Session extends ChangeNotifier {
     userId = null;
     user = null;
     shop = null;
+    riders = {};
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}
@@ -140,3 +184,12 @@ String tr(String en, String hi) => Session.instance.isHindi ? hi : en;
 
 /// "1 item" / "3 items" (Hindi has one form).
 String itemsLabel(num n) => tr(n == 1 ? '1 item' : '${n.toInt()} items', '${n.toInt()} आइटम');
+
+/// Store-setup text in any of the 23 languages (website's fallback order:
+/// chosen language, then Hindi, then English).
+String st(String key) {
+  final lang = Session.instance.lang;
+  return storeTexts[lang]?[key] ?? storeTexts['hi']?[key] ?? storeTexts['en']?[key] ?? key;
+}
+
+AppLanguage get currentLanguage => appLanguages.firstWhere((l) => l.code == Session.instance.lang, orElse: () => appLanguages[1]);

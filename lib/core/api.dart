@@ -37,6 +37,8 @@ class Api {
           res = await http.get(uri, headers: _headers).timeout(_timeout);
         case 'DELETE':
           res = await http.delete(uri, headers: _headers, body: encoded).timeout(_timeout);
+        case 'PUT':
+          res = await http.put(uri, headers: _headers, body: encoded).timeout(_timeout);
         default:
           res = await http.post(uri, headers: _headers, body: encoded).timeout(_timeout);
       }
@@ -221,8 +223,40 @@ class Api {
     return null;
   }
 
+  /// Cancels a rider trip (by its gotan `_id`) so riders stop seeing it.
+  static Future<void> cancelRiderTrip(String tripId, {String reason = ''}) =>
+      gotanPost('api/digiorder/setorderStatus', {'orderId': tripId, 'riderStatus': 'Cancelled', if (reason.isNotEmpty) 'reason': reason});
+
+  /// Every rider delivery for the shop, in one call.
+  static Future<List<Map<String, dynamic>>> shopRiderTrips(String shopId) async {
+    final data = await gotanPost('api/digiorder/shopdigiorder', {'shopId': shopId});
+    final list = data is Map ? data['shopOrderDetail'] : null;
+    return list is List ? list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList() : [];
+  }
+
   /// Asks the DigiStall team to connect the new subdomain.
   static Future<void> requestSubdomainSetup(String subdomain) => gotanPost('api/digi/subdomainmail', {'subdomain': subdomain});
 
   static Future<void> sendWelcomeEmail(String email) => gotanPost('api/digi/welcomeemail', {'email': email});
+
+  /// Lists (or updates) the shop on the Gotan marketplace under [formats].
+  static Future<void> syncGotanShop({
+    required String shopId,
+    required String heading,
+    required String desc,
+    required String shopImage,
+    required List<String> formats,
+  }) =>
+      _ok('PUT', '${gotan}api/shop/editshop', {
+        'shopId': shopId,
+        'heading': heading,
+        'desc': desc,
+        'shopImage': shopImage,
+        'cityName': 'Gotan',
+        'formats': formats,
+        'isApproved': true,
+      });
+
+  /// Marks a new shop as an AppSumo shop (for users who came via AppSumo).
+  static Future<void> markAppSumoShop(String shopId) => post('appsumo/shop', {'shopId': shopId});
 }

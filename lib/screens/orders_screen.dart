@@ -10,22 +10,22 @@ import '../core/app_nav.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
+import '../core/rider.dart';
 import '../services/invoice_pdf.dart';
+import '../services/notification_service.dart';
 import '../widgets/ds.dart';
 import 'location_picker_screen.dart';
 
-const _flow = ['pending', 'accepted', 'shipped', 'delivered', 'cancel'];
+const _flow = ['accepted', 'shipped', 'delivered', 'cancel'];
 
 String statusLabel(String s) => switch (s) {
-      'pending' => tr('Pending', 'नए ऑर्डर'),
-      'accepted' => tr('Accepted', 'स्वीकृत'),
+      'accepted' => tr('Orders', 'ऑर्डर'),
       'shipped' => tr('Shipped', 'शिप हुए'),
       'delivered' => tr('Delivered', 'पहुँचे'),
       _ => tr('Cancelled', 'रद्द'),
     };
 
 (Color, Color) statusColors(String s) => switch (s) {
-      'pending' => (const Color(0xFFFFF4E5), const Color(0xFFB97F00)),
       'accepted' => (DS.backdrop, DS.teal),
       'shipped' => (const Color(0xFFE5F0FF), const Color(0xFF1976D2)),
       'delivered' => (const Color(0xFFE5F6EE), DS.green),
@@ -40,7 +40,7 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> with SessionAware {
-  String _tab = 'pending';
+  String _tab = 'accepted';
   final _search = TextEditingController();
   final _scroll = ScrollController();
   final _keys = <String, GlobalKey>{};
@@ -98,7 +98,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SessionAware {
   Widget build(BuildContext context) {
     final s = Session.instance;
     final all = s.orders;
-    final visible = all.where((o) => o.status == _tab && o.matches(_search.text)).toList();
+    final visible = all.where((o) => s.stageOf(o) == _tab && o.matches(_search.text)).toList();
     return RefreshIndicator(
       color: DS.teal,
       onRefresh: () async {
@@ -114,7 +114,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SessionAware {
           sliver: SliverList.list(children: [
             ScreenHeader(
               title: tr('Orders', 'ऑर्डर'),
-              subtitle: tr('Accept, ship and deliver orders. Pull down to refresh.', 'ऑर्डर स्वीकार करें, भेजें और पहुँचाएँ। रिफ़्रेश के लिए नीचे खींचें।'),
+              subtitle: tr('New orders arrive confirmed. Ship and deliver them here. Pull down to refresh.', 'नए ऑर्डर कन्फ़र्म होकर आते हैं। उन्हें यहीं से भेजें और पहुँचाएँ। रिफ़्रेश के लिए नीचे खींचें।'),
             ),
             TextField(
               controller: _search,
@@ -138,7 +138,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SessionAware {
               for (final st in _flow) ...[
                 _TabChip(
                   label: statusLabel(st),
-                  count: all.where((o) => o.status == st).length,
+                  count: all.where((o) => s.stageOf(o) == st).length,
                   selected: _tab == st,
                   onTap: () => setState(() => _tab = st),
                 ),
@@ -151,11 +151,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SessionAware {
         if (visible.isEmpty)
           SliverToBoxAdapter(
             child: EmptyStall(
-              emoji: _tab == 'pending' ? '🛍️' : '📦',
+              emoji: _tab == 'accepted' ? '🛍️' : '📦',
               title: _search.text.isNotEmpty
                   ? tr('No matching orders', 'कोई ऑर्डर नहीं मिला')
-                  : _tab == 'pending'
-                      ? tr('No pending orders', 'कोई नया ऑर्डर नहीं')
+                  : _tab == 'accepted'
+                      ? tr('No orders to ship', 'भेजने के लिए कोई ऑर्डर नहीं')
                       : tr('Nothing here yet', 'अभी कुछ नहीं'),
               message: tr('When a customer places an order, you can manage everything right here.', 'ग्राहक ऑर्डर करेगा तो आप यहीं से प्रबंधित कर सकेंगे।'),
             ),
@@ -231,9 +231,15 @@ class _OrderCardState extends State<OrderCard> {
   String? _time;
   late final _partner = TextEditingController(text: widget.order.deliveryPartner);
   late final _tracking = TextEditingController(text: widget.order.shippingId);
-  Map<String, dynamic>? _rider;
+  Map<String, dynamic>? _fetchedRider;
 
   OrderGroup get o => widget.order;
+
+  /// Rider trip from the shop-wide feed, or fetched for this order.
+  Map<String, dynamic>? get _rider => Session.instance.riders[o.id]?.raw ?? _fetchedRider;
+
+  /// Stage including rider progress (see [Session.stageOf]).
+  String get stage => Session.instance.stageOf(o);
   Shop? get shop => Session.instance.shop;
 
   @override
@@ -261,11 +267,22 @@ class _OrderCardState extends State<OrderCard> {
     super.dispose();
   }
 
+  /// Pill text: New / Finding rider / Rider accepted / Shipped / …
+  String get _stageLabel {
+    if (stage != 'accepted') return statusLabel(stage);
+    final t = Session.instance.riders[o.id] ?? (_fetchedRider == null ? null : RiderTrip(_fetchedRider!));
+    if (t == null || t.stage == 'cancelled') return o.isSelfDelivery ? tr('Self delivery', 'स्वयं डिलीवरी') : tr('New', 'नया');
+    return t.accepted ? tr('Rider accepted', 'राइडर स्वीकृत') : tr('Finding rider', 'राइडर खोज रहे हैं');
+  }
+
+  bool get _riderCancelled => '${_rider?['riderStatus'] ?? ''}'.toLowerCase() == 'cancelled';
+
   Future<void> _loadRider() async {
     if (o.status != 'accepted' && o.status != 'shipped') return;
+    if (Session.instance.riders.containsKey(o.id)) return;
     try {
       final r = await Api.riderOrder(o.id);
-      if (mounted) setState(() => _rider = r);
+      if (mounted) setState(() => _fetchedRider = r);
     } catch (_) {}
   }
 
@@ -298,12 +315,12 @@ class _OrderCardState extends State<OrderCard> {
   }
 
   Future<void> _setStatus(String status, String nextTab, String message) => _run(status, () async {
+        NotificationService.instance.markLocalChange(o.id, status);
         await Api.changeOrderStatus(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: status, note: _note());
         widget.onMoved(nextTab);
         return message;
       });
 
-  Future<void> _accept() => _setStatus('CONFIRMED', 'accepted', tr('Order accepted (moved to Accepted)', 'ऑर्डर स्वीकार हुआ (स्वीकृत टैब में गया)'));
   Future<void> _ship() => _setStatus('SHIPPED', 'shipped', tr('Marked as shipped (moved to Shipped)', 'शिप हो गया (शिप हुए टैब में गया)'));
   Future<void> _delivered() => _setStatus('DELIVERED', 'delivered', tr('Marked as delivered', 'ऑर्डर पहुँच गया'));
 
@@ -317,7 +334,15 @@ class _OrderCardState extends State<OrderCard> {
     );
     if (!ok) return;
     await _run('CANCEL', () async {
+      NotificationService.instance.markLocalChange(o.id, 'CANCEL');
       await Api.changeOrderStatus(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: 'CANCEL');
+      // Withdraw the delivery request so no rider goes to collect it.
+      final tripId = '${_rider?['_id'] ?? ''}';
+      if (tripId.isNotEmpty && !_riderCancelled) {
+        try {
+          await Api.cancelRiderTrip(tripId, reason: 'Order cancelled by seller');
+        } catch (_) {}
+      }
       widget.onMoved('cancel');
       return tr('Order cancelled', 'ऑर्डर रद्द कर दिया गया');
     });
@@ -357,6 +382,7 @@ class _OrderCardState extends State<OrderCard> {
       return;
     }
     await _run('OTP', () async {
+      NotificationService.instance.markLocalChange(o.id, 'DELIVERED');
       final ok = await Api.verifyDeliveryOtp(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, otp: otp);
       if (!ok) throw ApiException(tr('Wrong OTP. Please check with the customer.', 'OTP गलत है। ग्राहक से दोबारा पूछें।'));
       widget.onMoved('delivered');
@@ -482,9 +508,9 @@ class _OrderCardState extends State<OrderCard> {
 
   @override
   Widget build(BuildContext context) {
-    final (sBg, sFg) = statusColors(o.status);
+    final (sBg, sFg) = statusColors(stage);
     final busy = _busy != null;
-    final editable = o.status == 'accepted' || o.status == 'shipped';
+    final editable = stage == 'accepted' || stage == 'shipped';
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       decoration: BoxDecoration(
@@ -511,7 +537,7 @@ class _OrderCardState extends State<OrderCard> {
                 ]),
               ]),
             ),
-            Pill(statusLabel(o.status).toUpperCase(), bg: sBg, fg: sFg, border: sFg),
+            Pill(_stageLabel.toUpperCase(), bg: sBg, fg: sFg, border: sFg),
           ]),
           const SizedBox(height: 10),
           Wrap(spacing: 6, runSpacing: 6, children: [
@@ -525,7 +551,7 @@ class _OrderCardState extends State<OrderCard> {
           _customerBox(),
           const SizedBox(height: 14),
           _itemsTable(),
-          if (o.status != 'pending' && o.status != 'cancel') ...[
+          if (stage != 'cancel') ...[
             const SizedBox(height: 14),
             _deliveryBox(editable),
           ],
@@ -534,29 +560,27 @@ class _OrderCardState extends State<OrderCard> {
           const SizedBox(height: 14),
           Wrap(spacing: 8, runSpacing: 10, alignment: WrapAlignment.end, children: [
             DsButton(label: tr('Invoice', 'बिल'), icon: Icons.picture_as_pdf_outlined, variant: DsVariant.ghost, small: true, loading: _busy == 'PDF', onTap: busy ? null : _invoice),
-            if (o.status == 'pending' || o.status == 'accepted')
+            if (stage == 'accepted')
               DsButton(label: tr('Cancel', 'रद्द करें'), icon: Icons.cancel_outlined, variant: DsVariant.danger, small: true, loading: _busy == 'CANCEL', onTap: busy ? null : _cancel),
-            if (o.status == 'pending')
-              DsButton(label: tr('Accept order', 'ऑर्डर स्वीकार करें'), icon: Icons.check, small: true, loading: _busy == 'CONFIRMED', onTap: busy ? null : _accept),
-            if (o.status == 'accepted') ...[
+            if (stage == 'accepted') ...[
               DsButton(label: tr('Deliver myself', 'स्वयं डिलीवरी'), icon: Icons.directions_walk, variant: DsVariant.ghost, small: true, loading: _busy == 'SELF', onTap: busy ? null : _selfDeliver),
-              DsButton(label: tr('Send with rider', 'राइडर से भेजें'), icon: Icons.two_wheeler, variant: DsVariant.sun, small: true, loading: _busy == 'RIDER', onTap: busy ? null : _sendWithRider),
+              DsButton(label: _riderCancelled ? tr('Resend to rider', 'राइडर को फिर भेजें') : tr('Send with rider', 'राइडर से भेजें'), icon: Icons.two_wheeler, variant: DsVariant.sun, small: true, loading: _busy == 'RIDER', onTap: busy ? null : _sendWithRider),
               DsButton(label: tr('Mark shipped', 'शिप हो गया'), icon: Icons.local_shipping_outlined, small: true, loading: _busy == 'SHIPPED', onTap: busy ? null : _ship),
             ],
-            if (o.status == 'shipped')
+            if (stage == 'shipped')
               o.isSelfDelivery
                   ? DsButton(label: tr('Verify delivery OTP', 'OTP सत्यापित करें'), icon: Icons.lock_open, small: true, loading: _busy == 'OTP', onTap: busy ? null : _verifyOtp)
                   : DsButton(label: tr('Mark delivered', 'पहुँच गया'), icon: Icons.done_all, small: true, loading: _busy == 'DELIVERED', onTap: busy ? null : _delivered),
           ]),
-          if (o.status == 'delivered' || o.status == 'cancel')
+          if (stage == 'delivered' || stage == 'cancel')
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                Icon(o.status == 'delivered' ? Icons.check_circle : Icons.cancel, color: o.status == 'delivered' ? DS.green : DS.red, size: 20),
+                Icon(stage == 'delivered' ? Icons.check_circle : Icons.cancel, color: stage == 'delivered' ? DS.green : DS.red, size: 20),
                 const SizedBox(width: 6),
                 Text(
-                  o.status == 'delivered' ? tr('Order delivered', 'ऑर्डर पहुँच गया') : tr('Order cancelled', 'ऑर्डर रद्द हो चुका है'),
-                  style: DS.t(15, weight: FontWeight.w700, color: o.status == 'delivered' ? DS.green : DS.red),
+                  stage == 'delivered' ? tr('Order delivered', 'ऑर्डर पहुँच गया') : tr('Order cancelled', 'ऑर्डर रद्द हो चुका है'),
+                  style: DS.t(15, weight: FontWeight.w700, color: stage == 'delivered' ? DS.green : DS.red),
                 ),
               ]),
             ),
@@ -717,14 +741,22 @@ class _OrderCardState extends State<OrderCard> {
               const Icon(Icons.two_wheeler, color: DS.teal),
               const SizedBox(width: 10),
               Expanded(
-                child: riderInfo is Map
+                child: _riderCancelled
                     ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${riderInfo['name'] ?? tr('Gotan rider', 'Gotan राइडर')}', style: DS.t(15, weight: FontWeight.w700)),
-                        Text('${tr('Status', 'स्थिति')}: ${rider['riderStatus'] ?? '-'}', style: DS.mutedText(13.5)),
+                        Text(tr('The rider cancelled this delivery', 'राइडर ने यह डिलीवरी रद्द कर दी'), style: DS.t(15, weight: FontWeight.w700, color: DS.red)),
+                        Text(
+                          '${'${rider['cancelReason'] ?? ''}'.isEmpty ? '' : '${tr('Reason', 'कारण')}: ${rider['cancelReason']}. '}${tr('Send it to a rider again or deliver it yourself.', 'फिर से राइडर को भेजें या खुद पहुँचाएँ।')}',
+                          style: DS.mutedText(13.5),
+                        ),
                       ])
-                    : Text(tr('Waiting for a rider to accept…', 'राइडर के स्वीकार करने का इंतज़ार…'), style: DS.t(14.5, weight: FontWeight.w600)),
+                    : riderInfo is Map && rider['riderAccepted'] == true
+                        ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('${riderInfo['name'] ?? tr('Gotan rider', 'Gotan राइडर')}', style: DS.t(15, weight: FontWeight.w700)),
+                            Text('${tr('Status', 'स्थिति')}: ${rider['riderStatus'] ?? '-'}', style: DS.mutedText(13.5)),
+                          ])
+                        : Text(tr('Waiting for a rider to accept…', 'राइडर के स्वीकार करने का इंतज़ार…'), style: DS.t(14.5, weight: FontWeight.w600)),
               ),
-              if (riderInfo is Map && '${riderInfo['phoneNumber'] ?? ''}'.isNotEmpty)
+              if (!_riderCancelled && riderInfo is Map && '${riderInfo['phoneNumber'] ?? ''}'.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.call, color: DS.teal),
                   onPressed: () => callNumber(context, '${riderInfo['phoneNumber']}'),

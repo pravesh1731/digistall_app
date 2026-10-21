@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_nav.dart';
+import '../core/inbox.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
 import '../services/notification_service.dart';
@@ -9,6 +10,9 @@ import '../widgets/ds.dart';
 import 'billbook_screen.dart';
 import 'catalog_screen.dart';
 import 'home_screen.dart';
+import 'low_stock_screen.dart';
+import 'notifications_screen.dart';
+import 'profile_screen.dart';
 import 'orders_screen.dart';
 import 'tools_screen.dart';
 
@@ -33,8 +37,37 @@ class _MainShellState extends State<MainShell> with SessionAware {
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
+  /// In-app alerts (order collected, out for delivery, still looking for a
+  /// rider): a silent banner while the app is open.
+  void _showBanner(InboxItem item) {
+    if (!mounted) return;
+    final (icon, fg, bg) = alertStyle(item.kind);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        backgroundColor: Colors.white,
+        elevation: 6,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: DS.ink, width: 2)),
+        content: Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: fg)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.title, style: DS.t(15, weight: FontWeight.w700)),
+              Text(item.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: DS.mutedText(13.5)),
+            ]),
+          ),
+        ]),
+        action: item.orderId.isEmpty || item.title.startsWith('[TEST]')
+            ? null
+            : SnackBarAction(label: tr('VIEW', 'देखें'), textColor: DS.teal, onPressed: () => AppNav.openOrders(item.orderId)),
+      ));
+  }
+
   @override
   void dispose() {
+    if (NotificationService.instance.onInApp == _showBanner) NotificationService.instance.onInApp = null;
     AppNav.tab.removeListener(_onTab);
     NotificationService.instance.stopPolling();
     super.dispose();
@@ -45,6 +78,7 @@ class _MainShellState extends State<MainShell> with SessionAware {
   Future<void> _start() async {
     final s = Session.instance;
     final n = NotificationService.instance;
+    n.onInApp = _showBanner;
     try {
       await s.refreshAll();
     } catch (e) {
@@ -98,6 +132,28 @@ class _MainShellState extends State<MainShell> with SessionAware {
           },
         ),
         DsQuickAction(
+          icon: Icons.inventory_outlined,
+          title: tr('Update stock', 'स्टॉक अपडेट करें'),
+          subtitle: tr('Restock low and out-of-stock items', 'कम या खत्म स्टॉक भरें'),
+          bg: const Color(0xFFFEF3F2),
+          fg: const Color(0xFFD92D20),
+          onTap: () {
+            Navigator.pop(ctx);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const LowStockScreen()));
+          },
+        ),
+        DsQuickAction(
+          icon: Icons.location_on_outlined,
+          title: tr('Set pickup location', 'पिकअप लोकेशन सेट करें'),
+          subtitle: tr('Help delivery riders find you', 'डिलीवरी राइडर को आप तक पहुँचने में मदद करें'),
+          bg: const Color(0xFFE5F6EE),
+          fg: DS.green,
+          onTap: () {
+            Navigator.pop(ctx);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+          },
+        ),
+        DsQuickAction(
           icon: Icons.share_outlined,
           title: tr('Share store link', 'स्टोर लिंक शेयर करें'),
           subtitle: tr('Send on WhatsApp or copy', 'WhatsApp पर भेजें या कॉपी करें'),
@@ -115,7 +171,7 @@ class _MainShellState extends State<MainShell> with SessionAware {
   @override
   Widget build(BuildContext context) {
     final tab = AppNav.tab.value;
-    final pending = Session.instance.orders.where((o) => o.status == 'pending').length;
+    final pending = Session.instance.orders.where((o) => o.isNew).length;
     return PopScope(
       canPop: tab == ShellTab.home,
       onPopInvokedWithResult: (didPop, _) {

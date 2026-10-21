@@ -33,7 +33,8 @@ class Shop {
   String get gst => _str(raw['gstNumber']);
   String get upiId => _str(raw['upiId']);
   String get qrCode => _str(raw['QRCode']);
-  bool get cod => raw['cod'] == true;
+  /// The storefront offers cash on delivery unless `cod` is explicitly false.
+  bool get cod => raw['cod'] != false && raw['cod'] != 'false';
   bool get isOpen => raw['open'] != false && settings['open'] != false;
   String get logo => _str(header['logo']);
   String get tagline => _str(header['tagline']);
@@ -42,6 +43,15 @@ class Shop {
   double? get pickupLat => _num(raw['pickupLat'])?.toDouble();
   double? get pickupLng => _num(raw['pickupLng'])?.toDouble();
   bool get hasPickup => pickupLat != null && pickupLng != null;
+
+  /// Gotan marketplace categories (slugs from `store_formats.dart`). The
+  /// website writes them to `shopFormats`, `formats` and `settings.shopFormats`.
+  List<String> get formats {
+    for (final v in [raw['shopFormats'], raw['formats'], settings['shopFormats'], settings['formats']]) {
+      if (v is List && v.isNotEmpty) return v.map((e) => '$e').toList();
+    }
+    return const [];
+  }
 
   List<Map<String, dynamic>> get categories => _list(raw['categorys']);
   List<Map<String, dynamic>> get products => _list(raw['products']);
@@ -130,13 +140,18 @@ class OrderGroup {
   String get rawStatus => _str(first['orderStatus']).isEmpty ? 'PENDING' : _str(first['orderStatus']).toUpperCase();
 
   /// One of: pending, accepted, shipped, delivered, cancel.
+  /// One of: accepted, shipped, delivered, cancel. New orders are created
+  /// `CONFIRMED` by the backend; legacy `PENDING` ones need the same action,
+  /// so they count as accepted too (as on the website).
   String get status => switch (rawStatus) {
-        'CONFIRMED' || 'ACCEPTED' => 'accepted',
         'SHIPPED' => 'shipped',
         'DELIVERED' => 'delivered',
         'CANCEL' || 'CANCELLED' => 'cancel',
-        _ => 'pending',
+        _ => 'accepted',
       };
+
+  /// Needs the seller to ship it.
+  bool get isNew => status == 'accepted';
 
   String get paymentMethod => _str(first['paymentMethod']).isEmpty ? 'COD' : _str(first['paymentMethod']);
   String get transactionId => _str(first['transactionId']);
@@ -176,6 +191,25 @@ class OrderGroup {
   }
 
   String get fullAddress => _str(first['address']);
+
+  /// Short delivery area for alerts: city and PIN when the address has them.
+  String get deliveryArea {
+    final parts = address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    if (parts.length >= 3) return '${parts[parts.length - 3]} ${parts.last}'.trim();
+    return parts.isEmpty ? '' : parts.join(', ');
+  }
+
+  /// Order number as shown to sellers (last 8 characters of the id).
+  String get shortId => id.length > 8 ? id.substring(id.length - 8).toUpperCase() : id.toUpperCase();
+
+  /// Any customer note on the order (the storefront doesn't send one yet).
+  String get customerNote {
+    for (final k in ['customerNote', 'note', 'instructions']) {
+      final v = _str(first[k]);
+      if (v.isNotEmpty) return v;
+    }
+    return '';
+  }
   String get email => _str(first['email']);
   String get shopId => _str(first['shopId']);
   String get deliveryMode => _str(first['deliveryMode']).isEmpty ? 'RIDER' : _str(first['deliveryMode']).toUpperCase();

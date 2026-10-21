@@ -74,7 +74,7 @@
         <!-- Default Notification Channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="new_orders_channel" />
+            android:value="orders_loud" />
 
         <!-- Auto-init Firebase Messaging -->
         <meta-data

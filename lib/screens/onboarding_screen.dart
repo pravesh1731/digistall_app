@@ -8,6 +8,8 @@ import '../core/api.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
 import '../widgets/ds.dart';
+import '../core/languages_data.dart';
+import '../widgets/language_picker.dart';
 import 'gate.dart';
 import 'location_picker_screen.dart';
 import 'main_shell.dart';
@@ -116,10 +118,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
     final name = _name.text.trim();
     final address = _address.text.trim();
     if (_avail != _Avail.available) {
-      return setState(() => _error = tr('Please choose a valid and available store link.', 'कृपया एक मान्य और उपलब्ध दुकान लिंक चुनें।'));
+      return setState(() => _error = st('validDomainPrompt'));
     }
     if (name.isEmpty || address.isEmpty) {
-      return setState(() => _error = tr('Please enter your store name and full address.', 'कृपया दुकान का नाम और पूरा पता भरें।'));
+      return setState(() => _error = st('businessDetailsPrompt'));
     }
     setState(() {
       _busy = true;
@@ -194,10 +196,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
         'gstNumber': '',
         'validTill': 'Lifetime',
         'open': true,
+        // The schema defaults `cod` to false, which hides cash on delivery on
+        // the storefront; start new shops with it on so customers can pay.
+        'cod': true,
         if (_location != null) 'pickupLat': _location!.latitude,
         if (_location != null) 'pickupLng': _location!.longitude,
       });
       await Api.updateUserStatus(userId, 'COMPLETED');
+      if (user['sumo'] == true) await Api.markAppSumoShop(sub).catchError((_) {});
 
       // Same emails the website sends after setup; failures don't block.
       unawaited(Api.requestSubdomainSetup(sub).catchError((_) {}));
@@ -208,10 +214,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const MainShell(welcome: true)), (_) => false);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = '${tr('Store creation failed.', 'दुकान बनाने में समस्या आई।')} ${e.message}');
+      if (mounted) setState(() => _error = '${st('creationFailed')} ${e.message}');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Website's language card: popular languages as chips plus "Change (23)".
+  Widget _languageCard() {
+    const popular = ['hi', 'en', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'pa', 'ur'];
+    final current = Session.instance.lang;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: DS.paper, borderRadius: BorderRadius.circular(18), border: Border.all(color: DS.line, width: 2)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Icon(Icons.language, color: DS.teal),
+          const SizedBox(width: 8),
+          Expanded(child: Text(st('chooseLangCardTitle'), style: DS.h(18))),
+          TextButton(
+            onPressed: () => showLanguagePicker(context),
+            child: Text('${st('changeLang')} (${appLanguages.length})', style: DS.t(14.5, color: DS.teal, weight: FontWeight.w700)),
+          ),
+        ]),
+        Text(st('chooseLangCardSub'), style: DS.mutedText(14)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final code in popular)
+            DsChip(
+              label: appLanguages.firstWhere((l) => l.code == code).native,
+              selected: current == code,
+              onTap: () => Session.instance.setLang(code),
+            ),
+        ]),
+      ]),
+    );
   }
 
   Widget _availLine() {
@@ -222,11 +259,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
       _Avail.available => (
           Icons.check_circle,
           DS.green,
-          sub == _ownedSub ? tr('This is your link: https://$sub.digistall.in', 'यह आपका लिंक है: https://$sub.digistall.in') : tr('Great! https://$sub.digistall.in is available!', 'शानदार! https://$sub.digistall.in उपलब्ध है!')
+          sub == _ownedSub ? tr('This is your link: https://$sub.digistall.in', 'यह आपका लिंक है: https://$sub.digistall.in') : '${st('domainAvailable')} https://$sub.digistall.in'
         ),
-      _Avail.taken => (Icons.error_outline, DS.awning, tr('This link is already taken', 'यह लिंक पहले से इस्तेमाल में है')),
+      _Avail.taken => (Icons.error_outline, DS.awning, st('domainTaken')),
       _Avail.invalid => (Icons.info_outline, DS.muted, tr('Use at least 3 letters or numbers', 'कम से कम 3 अक्षर या अंक लिखें')),
-      _Avail.error => (Icons.wifi_off, DS.awning, tr('Could not check right now', 'अभी जाँच नहीं हो सकी')),
+      _Avail.error => (Icons.wifi_off, DS.awning, st('domainError')),
     };
     if (icon == null) return const SizedBox.shrink();
     return Padding(
@@ -250,7 +287,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
             child: Row(children: [
               const DsLogo(size: 22),
               const Spacer(),
-              const LangToggle(),
+              const LanguageButton(),
             ]),
           ),
           const SizedBox(height: 14),
@@ -266,18 +303,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
               Row(children: [
                 const Icon(Icons.auto_awesome, color: DS.marigold, size: 20),
                 const SizedBox(width: 8),
-                Text(tr('QUICK ONBOARDING', 'चरणबद्ध सेटअप'), style: DS.t(13, color: DS.teal, weight: FontWeight.w700)),
+                Text(st('stepSetup').toUpperCase(), style: DS.t(13, color: DS.teal, weight: FontWeight.w700)),
               ]),
               const SizedBox(height: 6),
-              Text(tr('Create your digital store', 'अपनी डिजिटल दुकान बनाएं'), style: DS.h(28)),
+              Text(st('createStoreTitle'), style: DS.h(28)),
               const SizedBox(height: 6),
-              Text(tr('Complete these quick details to launch your online store instantly.', 'बस डोमेन और पता सेट करें, और आपकी दुकान तुरंत ऑनलाइन शुरू हो जाएगी।'), style: DS.mutedText(15)),
+              Text(st('createStoreSub'), style: DS.mutedText(15)),
               const SizedBox(height: 20),
               if (_error != null) ...[ErrorBanner(_error!), const SizedBox(height: 16)],
+              _languageCard(),
+              const SizedBox(height: 18),
               DsSection(
                 step: '1',
-                title: tr('Store web link', 'दुकान का वेब लिंक'),
-                subtitle: tr('Customers will use this link to browse and order from your store.', 'ग्राहक इसी लिंक से आपकी दुकान पर आएंगे।'),
+                title: st('domainStepTitle'),
+                subtitle: st('domainStepSub'),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [
                     Expanded(
@@ -289,7 +328,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
                         enableSuggestions: false,
                         inputFormatters: [LengthLimitingTextInputFormatter(30)],
                         style: DS.t(17, weight: FontWeight.w600),
-                        decoration: dsInputDecoration(hint: tr('e.g. sharmastore', 'जैसे sharmastore')).copyWith(
+                        decoration: dsInputDecoration(hint: st('domainPlaceholder')).copyWith(
                           enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.horizontal(left: Radius.circular(13)), borderSide: BorderSide(color: DS.line, width: 2)),
                           focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.horizontal(left: Radius.circular(13)), borderSide: BorderSide(color: DS.teal, width: 2)),
                         ),
@@ -311,15 +350,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
               const SizedBox(height: 18),
               DsSection(
                 step: '2',
-                title: tr('Business details', 'दुकान की जानकारी'),
-                subtitle: tr('This appears on your storefront, visiting cards and invoices.', 'यह जानकारी आपके विज़िटिंग कार्ड, रसीद और होमपेज पर दिखेगी।'),
+                title: st('businessStepTitle'),
+                subtitle: st('businessStepSub'),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  DsField(label: tr('Store name *', 'दुकान का नाम *'), controller: _name, hint: tr('e.g. Sharma General Store', 'उदा. शर्मा जनरल स्टोर'), maxLength: 40, textCapitalization: TextCapitalization.words),
+                  DsField(label: st('storeNameLabel'), controller: _name, hint: st('storeNamePlaceholder'), maxLength: 40, textCapitalization: TextCapitalization.words),
                   const SizedBox(height: 14),
                   DsField(
-                    label: tr('Store full address *', 'दुकान का पूरा पता *'),
+                    label: st('storeAddressLabel'),
                     controller: _address,
-                    hint: tr('Shop number, market, road, city, pincode…', 'दुकान नं., मुख्य बाज़ार, शहर, पिनकोड…'),
+                    hint: st('storeAddressPlaceholder'),
                     maxLines: 3,
                     minLines: 2,
                   ),
@@ -334,8 +373,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
               const SizedBox(height: 18),
               DsSection(
                 step: '3',
-                title: tr('Pin store location', 'नक़्शे पर दुकान चुनें'),
-                subtitle: tr('Needed for pickup and delivery. You can also do this later in Profile.', 'पिकअप और डिलीवरी के लिए ज़रूरी। यह बाद में प्रोफ़ाइल में भी कर सकते हैं।'),
+                title: st('pinMapLabel'),
+                subtitle: st('mapPinHelper'),
                 child: _location == null
                     ? DsButton(label: tr('Pin on map', 'मैप पर पिन करें'), icon: Icons.add_location_alt_outlined, variant: DsVariant.ghost, block: true, onTap: _pickLocation)
                     : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -346,7 +385,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
               ),
               const SizedBox(height: 22),
               DsButton(
-                label: _busy ? tr('Creating your store…', 'दुकान तैयार हो रही है…') : tr('Launch my store! 🚀', 'दुकान ऑनलाइन लाइव करें 🚀'),
+                label: _busy ? st('launching') : st('launchBtn'),
                 icon: Icons.storefront,
                 block: true,
                 loading: _busy,
@@ -354,7 +393,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SessionAware {
               ),
               const SizedBox(height: 12),
               Text(
-                tr('✓ You can add products, customise the look and change settings any time later.', '✓ आप बाद में कभी भी नए प्रोडक्ट्स, समय और सेटिंग्स बदल सकते हैं।'),
+                st('footerHint'),
                 textAlign: TextAlign.center,
                 style: DS.mutedText(13),
               ),

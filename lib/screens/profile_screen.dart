@@ -12,6 +12,8 @@ import '../widgets/ds.dart';
 import 'gate.dart';
 import 'location_picker_screen.dart';
 import 'onboarding_screen.dart';
+import 'store_formats_screen.dart';
+import '../widgets/language_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,6 +25,20 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SessionAware {
   bool _savingLoc = false;
   bool _savingDays = false;
+  bool _savingCod = false;
+
+  Future<void> _setCod(Shop shop, bool on) async {
+    setState(() => _savingCod = true);
+    try {
+      await Api.updatePayment(shopId: shop.shopId, upiId: shop.upiId, qrCode: shop.qrCode, cod: on);
+      await Session.instance.patchShop({'cod': on});
+      if (mounted) toast(context, on ? tr('Cash on delivery enabled', 'कैश ऑन डिलीवरी चालू') : tr('Cash on delivery disabled', 'कैश ऑन डिलीवरी बंद'));
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message, error: true);
+    } finally {
+      if (mounted) setState(() => _savingCod = false);
+    }
+  }
 
   Future<void> _pickLocation(Shop shop) async {
     final p = await Navigator.push<LatLng>(
@@ -189,10 +205,70 @@ class _ProfileScreenState extends State<ProfileScreen> with SessionAware {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('UPI: ${shop.upiId.isEmpty ? none : shop.upiId}', style: DS.t(15, weight: FontWeight.w600)),
-                      Text(tr('Cash on delivery is always offered too', 'कैश ऑन डिलीवरी भी हमेशा उपलब्ध है'), style: DS.mutedText(14)),
+                      Text(
+                        shop.qrCode.isEmpty ? tr('No QR code set', 'QR कोड नहीं है') : tr('QR code set', 'QR कोड लगा है'),
+                        style: DS.mutedText(14),
+                      ),
                     ]),
                   ),
                 ]),
+                const SizedBox(height: 10),
+                Container(height: 1.5, color: DS.line),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: shop.cod,
+                  onChanged: _savingCod ? null : (v) => _setCod(shop, v),
+                  title: Text(tr('Cash on delivery (COD)', 'कैश ऑन डिलीवरी (COD)'), style: DS.t(16, weight: FontWeight.w700)),
+                  subtitle: Text(
+                    shop.cod
+                        ? tr('Customers can pay cash when the order arrives.', 'ग्राहक ऑर्डर मिलने पर नकद भुगतान कर सकते हैं।')
+                        : tr('Off: customers must pay by UPI at checkout.', 'बंद: ग्राहकों को चेकआउट पर UPI से भुगतान करना होगा।'),
+                    style: DS.mutedText(13.5),
+                  ),
+                ),
+                if (!shop.cod && shop.upiId.isEmpty && shop.qrCode.isEmpty)
+                  Text(
+                    tr('⚠️ With COD off and no UPI, customers cannot pay. Turn COD on or add UPI.', '⚠️ COD बंद है और UPI नहीं है, ग्राहक भुगतान नहीं कर पाएँगे। COD चालू करें या UPI जोड़ें।'),
+                    style: DS.t(13.5, color: DS.red, weight: FontWeight.w600),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            DsCard(
+              flat: true,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const Icon(Icons.storefront_outlined, color: Color(0xFFEA580C)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(tr('Gotan shops & services', 'गोटन शॉप्स और सर्विसेज़'), style: DS.h(18))),
+                  DsButton(
+                    label: tr('Edit', 'बदलें'),
+                    variant: DsVariant.ghost,
+                    small: true,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreFormatsScreen())),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                shop.formats.isEmpty
+                    ? Text(tr('No category selected. Choose one to be listed on Gotan.', 'कोई कैटेगरी नहीं चुनी। गोटन पर दिखने के लिए चुनें।'), style: DS.mutedText(14))
+                    : Wrap(spacing: 6, runSpacing: 6, children: [
+                        for (final f in shop.formats) Pill(storeFormatLabel(f), bg: const Color(0xFFFFF4ED), fg: const Color(0xFFC2410C)),
+                      ]),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            DsCard(
+              flat: true,
+              child: Row(children: [
+                const Icon(Icons.language, color: DS.teal),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('Language', 'भाषा'), style: DS.h(18)),
+                    Text('${currentLanguage.native} • ${tr('23 languages', '23 भाषाएँ')}', style: DS.mutedText(13.5)),
+                  ]),
+                ),
+                DsButton(label: tr('Change', 'बदलें'), variant: DsVariant.ghost, small: true, onTap: () => showLanguagePicker(context)),
               ]),
             ),
             const SizedBox(height: 16),
@@ -391,7 +467,6 @@ class _PaymentFormState extends State<_PaymentForm> {
       _error = null;
     });
     try {
-      // The storefront always offers cash on delivery, so `cod` is kept as is.
       await Api.updatePayment(shopId: widget.shop.shopId, upiId: upi, qrCode: _qr, cod: widget.shop.cod);
       await Session.instance.patchShop({'upiId': upi, 'QRCode': _qr});
       if (mounted) {
@@ -426,8 +501,6 @@ class _PaymentFormState extends State<_PaymentForm> {
           ]),
         ),
       ]),
-      const SizedBox(height: 12),
-      Text(tr('Customers can also choose cash on delivery at checkout.', 'ग्राहक चेकआउट पर कैश ऑन डिलीवरी भी चुन सकते हैं।'), style: DS.mutedText(13.5)),
       const SizedBox(height: 16),
       DsButton(label: tr('Save', 'सेव करें'), block: true, loading: _saving, onTap: _uploading ? null : _save),
     ]);

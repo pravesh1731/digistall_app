@@ -9,6 +9,7 @@ import '../core/api.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
 import '../widgets/ds.dart';
+import '../widgets/language_picker.dart';
 import 'gate.dart';
 
 enum _Step { welcome, phone, otp }
@@ -115,6 +116,7 @@ class _AuthScreenState extends State<AuthScreen> with SessionAware {
     try {
       account = await g.signIn();
     } catch (e) {
+      debugPrint('Google sign-in failed: $e');
       setState(() => _error = tr('Google sign-in failed. Please try again.', 'Google से लॉग इन नहीं हो सका।'));
       return;
     }
@@ -199,7 +201,7 @@ class _AuthScreenState extends State<AuthScreen> with SessionAware {
                     child: Column(children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                        child: Row(children: [const DsLogo(light: true), const Spacer(), const LangToggle(onDark: true)]),
+                        child: Row(children: [const DsLogo(light: true), const Spacer(), const LanguageButton(onDark: true)]),
                       ),
                       if (_step == _Step.welcome || size.height > 760) const _StallArt() else const SizedBox(height: 28),
                       Expanded(child: _sheet()),

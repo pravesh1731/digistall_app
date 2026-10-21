@@ -11,7 +11,9 @@ import '../core/theme.dart';
 import '../widgets/ds.dart';
 import 'catalog_screen.dart';
 import 'location_picker_screen.dart';
+import 'notifications_screen.dart';
 import 'profile_screen.dart';
+import 'store_formats_screen.dart';
 
 /// Shares the storefront link through the system share sheet and remembers
 /// it for the setup checklist.
@@ -105,11 +107,15 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
           ScreenHeader(
             title: _greeting(),
             subtitle: tr("Here's what's happening at your shop today.", 'आज आपकी दुकान का हाल यह है।'),
-            trailing: DsIconButton(
-              icon: Icons.person_outline,
-              tooltip: tr('Profile', 'प्रोफ़ाइल'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-            ),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              const NotificationBell(),
+              const SizedBox(width: 10),
+              DsIconButton(
+                icon: Icons.person_outline,
+                tooltip: tr('Profile', 'प्रोफ़ाइल'),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+              ),
+            ]),
           ),
           if (shop == null)
             Padding(
@@ -226,6 +232,11 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
     final steps = [
       (tr('Add your first category', 'पहली कैटेगरी जोड़ें'), shop.categories.isNotEmpty, () => showCategorySheet(context)),
       (tr('Add your first product', 'पहला प्रोडक्ट जोड़ें'), shop.products.isNotEmpty, () => AppNav.tab.value = ShellTab.catalog),
+      (
+        tr('Select store category & format', 'दुकान / सेवा कैटेगरी चुनें'),
+        shop.formats.isNotEmpty,
+        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreFormatsScreen())),
+      ),
       (tr('Set your pickup location', 'पिकअप लोकेशन सेट करें'), shop.hasPickup, () => _setLocation(shop)),
       (tr('Share your store link', 'स्टोर लिंक शेयर करें'), _shared, _share),
     ];
@@ -236,12 +247,12 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(child: Text(tr('Get your shop ready', 'अपनी दुकान तैयार करें'), style: DS.h(19))),
-            Text(tr('$done of 4 done', '$done / 4 पूरा'), style: DS.mutedText(14)),
+            Text(tr('$done of ${steps.length} done', '$done / ${steps.length} पूरा'), style: DS.mutedText(14)),
           ]),
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(9),
-            child: LinearProgressIndicator(value: done / 4, minHeight: 10, backgroundColor: DS.tealSoft, color: DS.awning),
+            child: LinearProgressIndicator(value: done / steps.length, minHeight: 10, backgroundColor: DS.tealSoft, color: DS.awning),
           ),
           const SizedBox(height: 8),
           for (final st in steps)
@@ -281,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
   Widget _revenueCard(List<OrderGroup> orders) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final counted = orders.where((o) => o.status == 'accepted' || o.status == 'shipped' || o.status == 'delivered').toList();
+    final counted = orders.where((o) => o.status != 'cancel').toList();
     bool inPeriod(OrderGroup o) {
       final d = o.date;
       if (_period == 'all') return true;
@@ -357,7 +368,7 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
         Text(
           counted.isEmpty
               ? tr('Your first sale will show up here.', 'आपकी पहली बिक्री यहाँ दिखेगी।')
-              : tr('Counts orders you have accepted, shipped or delivered.', 'स्वीकार, शिप या डिलीवर किए गए ऑर्डर गिने जाते हैं।'),
+              : tr('Counts every order except cancelled ones.', 'रद्द ऑर्डर छोड़कर सभी ऑर्डर गिने जाते हैं।'),
           style: DS.mutedText(14),
         ),
       ]),
@@ -365,11 +376,11 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
   }
 
   Widget _pendingCard(List<OrderGroup> orders) {
-    final pending = orders.where((o) => o.status == 'pending').toList();
+    final pending = orders.where((o) => o.isNew).toList();
     return DsCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text(tr('Needs your answer', 'आपके जवाब का इंतज़ार'), style: DS.h(19))),
+          Expanded(child: Text(tr('New orders to ship', 'भेजने के लिए नए ऑर्डर'), style: DS.h(19))),
           TextButton(
             onPressed: () => AppNav.tab.value = ShellTab.orders,
             child: Text(tr('All orders', 'सभी ऑर्डर'), style: DS.t(15, color: DS.teal, weight: FontWeight.w600)),
@@ -378,8 +389,8 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
         if (pending.isEmpty)
           EmptyStall(
             emoji: '🛍️',
-            title: tr('No pending orders', 'कोई नया ऑर्डर नहीं'),
-            message: tr('When a customer places an order, you can accept it from here.', 'ग्राहक ऑर्डर करेगा तो आप यहीं से स्वीकार कर सकेंगे।'),
+            title: tr('No new orders', 'कोई नया ऑर्डर नहीं'),
+            message: tr('When a customer places an order, you can ship it from the Orders tab.', 'ग्राहक ऑर्डर करेगा तो आप ऑर्डर टैब से उसे भेज सकेंगे।'),
           )
         else
           for (final o in pending.take(3))
@@ -418,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
 
   Widget _stats(Shop shop, List<OrderGroup> orders) {
     final customers = orders.map((o) => o.customerPhone.isNotEmpty ? o.customerPhone : o.customerName).toSet().length;
-    final pending = orders.where((o) => o.status == 'pending').length;
+    final pending = orders.where((o) => o.isNew).length;
     Widget stat(IconData icon, Color bg, Color fg, String value, String label, VoidCallback? onTap) => Expanded(
           child: DsCard(
             flat: true,
@@ -435,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
         );
     return Column(children: [
       Row(children: [
-        stat(Icons.inventory_2_outlined, DS.tealSoft, DS.teal, '${orders.length}', tr('Orders', 'ऑर्डर'), () => AppNav.tab.value = ShellTab.orders),
+        stat(Icons.inventory_2_outlined, DS.tealSoft, DS.teal, '${orders.length}', tr('Total orders', 'कुल ऑर्डर'), () => AppNav.tab.value = ShellTab.orders),
         const SizedBox(width: 12),
         stat(Icons.grid_view_rounded, DS.tintYellow, DS.tintYellowFg, '${shop.products.length}', tr('Products', 'प्रोडक्ट'), () => AppNav.tab.value = ShellTab.catalog),
       ]),
@@ -443,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with SessionAware {
       Row(children: [
         stat(Icons.people_outline, DS.tintViolet, DS.tintVioletFg, '$customers', tr('Customers', 'ग्राहक'), null),
         const SizedBox(width: 12),
-        stat(Icons.error_outline, DS.tintCoral, DS.awning, '$pending', tr('Pending', 'नए'), () => AppNav.tab.value = ShellTab.orders),
+        stat(Icons.error_outline, DS.tintCoral, DS.awning, '$pending', tr('To ship', 'भेजने हैं'), () => AppNav.tab.value = ShellTab.orders),
       ]),
     ]);
   }

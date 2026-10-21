@@ -44,6 +44,11 @@ android {
     }
 
     buildTypes {
+        // Google sign-in only works for SHA-1s that have an Android OAuth client in
+        // Firebase, and only the release key has one, so debug builds use it too.
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("release")
+        }
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false

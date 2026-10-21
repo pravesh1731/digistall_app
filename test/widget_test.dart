@@ -55,7 +55,8 @@ void main() {
       expect(o.itemsSubtotal, 650);
       expect(o.total, 675); // coupontotal includes delivery + platform fee
       expect(o.deliveryPartner, 'Gotan Rider');
-      expect(orders.last.status, 'pending');
+      expect(orders.last.status, 'accepted'); // legacy PENDING needs shipping too
+      expect(orders.last.isNew, isTrue);
     });
 
     test('falls back to items + fees when coupontotal is missing', () {
@@ -71,7 +72,7 @@ void main() {
       String statusOf(String raw) => OrderGroup.fromRaw([
             {'orderId': raw, 'orderStatus': raw},
           ]).single.status;
-      expect(statusOf('PENDING'), 'pending');
+      expect(statusOf('PENDING'), 'accepted');
       expect(statusOf('CONFIRMED'), 'accepted');
       expect(statusOf('SHIPPED'), 'shipped');
       expect(statusOf('DELIVERED'), 'delivered');
@@ -123,6 +124,10 @@ void main() {
     expect(shop.hasPickup, isTrue);
     expect(shop.pickupLng, 73.74);
     expect(shop.isOpen, isTrue);
+    expect(shop.cod, isTrue); // storefront offers COD unless cod == false
+    expect(Shop({'cod': false}).cod, isFalse);
+    expect(shop.formats, isEmpty);
+    expect(Shop({'settings': {'shopFormats': ['food-bakery']}}).formats, ['food-bakery']);
     expect(shop.url, 'sharmastore.digistall.in');
   });
 

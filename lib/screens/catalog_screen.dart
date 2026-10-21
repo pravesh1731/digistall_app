@@ -7,6 +7,7 @@ import '../core/models.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
 import '../widgets/ds.dart';
+import 'low_stock_screen.dart';
 import 'product_form_screen.dart';
 
 /// Opens the product form, asking for a category first if there is none.
@@ -202,6 +203,8 @@ class _CatalogScreenState extends State<CatalogScreen> with SessionAware {
             const SizedBox(width: 10),
             Expanded(child: DsButton(label: tr('Add product', 'प्रोडक्ट जोड़ें'), icon: Icons.add_box_outlined, variant: DsVariant.sun, block: true, onTap: () => openNewProduct(context))),
           ]),
+          const SizedBox(height: 12),
+          _StockBanner(count: lowStockCount(shop)),
           const SizedBox(height: 18),
           if (shop == null)
             const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
@@ -399,6 +402,37 @@ class _CategoryScreenState extends State<CategoryScreen> with SessionAware {
           else
             for (final (i, p) in products.indexed) ProductRow(product: p, tint: DS.tints[i % 3]),
         ]),
+      ),
+    );
+  }
+}
+
+/// "Update stock" entry with the number of low / out-of-stock products.
+class _StockBanner extends StatelessWidget {
+  const _StockBanner({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final alert = count > 0;
+    final fg = alert ? const Color(0xFFB42318) : DS.ink;
+    return Material(
+      color: alert ? const Color(0xFFFEF3F2) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: alert ? const Color(0xFFFDA29B) : DS.line, width: 1.5)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LowStockScreen())),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(children: [
+            Icon(Icons.warning_amber_rounded, color: alert ? const Color(0xFFD92D20) : DS.muted),
+            const SizedBox(width: 10),
+            Expanded(child: Text(tr('Update stock (low / out of stock)', 'स्टॉक अपडेट करें (कम/खत्म स्टॉक)'), style: DS.t(15, weight: FontWeight.w700, color: fg))),
+            alert
+                ? Pill(tr('$count alert${count > 1 ? 's' : ''}', '$count अलर्ट'), bg: const Color(0xFFD92D20), fg: Colors.white)
+                : Text(tr('✓ Stock healthy', '✓ सब सही है'), style: DS.t(13.5, color: DS.green, weight: FontWeight.w700)),
+          ]),
+        ),
       ),
     );
   }

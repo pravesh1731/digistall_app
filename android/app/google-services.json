@@ -51,28 +51,48 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:43638107391:android:5574c84076cc64270bf0ca",
+        "mobilesdk_app_id": "1:43638107391:android:6eacb57a5f8b74a70bf0ca",
         "android_client_info": {
-          "package_name": "com.digistall.gotan"
+          "package_name": "com.digistall.gotan1"
         }
       },
       "oauth_client": [
         {
-          "client_id": "43638107391-m0nua0e4viqjkrf3eqm76oci7s2f16vo.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.digistall.gotan",
-            "certificate_hash": "99c93d9a89e617458db7bd3eb7022a8f9012892b"
-          }
-        },
+          "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
         {
-          "client_id": "43638107391-ocq99anfulhlfggp7ftvrfvo2punlmfk.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.digistall.gotan",
-            "certificate_hash": "94eb61fcf3b54289bcb86500112f3c53408feaa7"
-          }
-        },
+          "current_key": "AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "43638107391-1b3223kpkkm78v0lnko40af0pskg4opc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.digirider"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43638107391:android:42f313a5ef4fb62f0bf0ca",
+        "android_client_info": {
+          "package_name": "com.digistall.rider"
+        }
+      },
+      "oauth_client": [
         {
           "client_id": "43638107391-tbsdk2a0qgg760r8o7ght2p12hdppeqn.apps.googleusercontent.com",
           "client_type": 3

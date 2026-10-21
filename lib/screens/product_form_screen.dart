@@ -104,6 +104,39 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     });
   }
 
+  /// Drafts a description from the details already filled in (the website's
+  /// "AI Enhance" depends on a retired Gemini model, so this works offline).
+  Future<void> _writeDescription() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) return _fail(tr('Enter the product name first', 'पहले प्रोडक्ट का नाम लिखें'));
+    if (_desc.text.trim().isNotEmpty) {
+      final ok = await confirmDialog(context, title: tr('Replace description?', 'विवरण बदलें?'), message: tr('Your current description will be replaced.', 'आपका मौजूदा विवरण बदल जाएगा।'));
+      if (!ok) return;
+    }
+    final shop = Session.instance.shop;
+    final price = num.tryParse(_price.text.trim()) ?? 0;
+    final mrp = num.tryParse(_mrp.text.trim()) ?? 0;
+    final save = mrp > price && price > 0 ? mrp - price : 0;
+    final sizes = _variants.keys.toList();
+    final hi = Session.instance.isHindi;
+    final lines = hi
+        ? [
+            '${shop?.name ?? 'हमारी दुकान'} से $name${_category == null ? '' : ' (${_category!})'}।',
+            if (price > 0) 'कीमत: ${inr(price)} प्रति $_unit${save > 0 ? ' — MRP ${inr(mrp)} पर ${inr(save)} की बचत' : ''}।',
+            if (sizes.isNotEmpty) 'उपलब्ध विकल्प: ${sizes.join(', ')}।',
+            'अच्छी गुणवत्ता, सही दाम और भरोसेमंद सेवा।',
+            if (shop != null) 'ऑनलाइन ऑर्डर करें: ${shop.url}',
+          ]
+        : [
+            '$name${_category == null ? '' : ' from our ${_category!} range'} at ${shop?.name ?? 'our store'}.',
+            if (price > 0) 'Price: ${inr(price)} per $_unit${save > 0 ? ' — save ${inr(save)} on the MRP of ${inr(mrp)}' : ''}.',
+            if (sizes.isNotEmpty) 'Available options: ${sizes.join(', ')}.',
+            'Good quality, fair price and trusted local service.',
+            if (shop != null) 'Order online at ${shop.url}',
+          ];
+    setState(() => _desc.text = lines.join('\n'));
+  }
+
   Future<void> _save() async {
     final name = _name.text.trim();
     final price = num.tryParse(_price.text.trim()) ?? 0;
@@ -305,6 +338,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               DsSection(
                 step: '4',
                 title: tr('Description', 'विवरण'),
+                trailing: DsButton(label: tr('Write for me', 'लिख दें'), icon: Icons.auto_awesome, variant: DsVariant.sun, small: true, onTap: _writeDescription),
                 child: DsField(
                   label: '',
                   controller: _desc,

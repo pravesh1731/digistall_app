@@ -9,11 +9,15 @@ import 'package:digistall/screens/billbook_screen.dart';
 import 'package:digistall/screens/business_cards_screen.dart';
 import 'package:digistall/screens/catalog_screen.dart';
 import 'package:digistall/screens/home_screen.dart';
+import 'package:digistall/screens/low_stock_screen.dart';
+import 'package:digistall/screens/notifications_screen.dart';
+import 'package:digistall/core/inbox.dart';
 import 'package:digistall/screens/onboarding_screen.dart';
 import 'package:digistall/screens/orders_screen.dart';
 import 'package:digistall/screens/product_form_screen.dart';
 import 'package:digistall/screens/profile_screen.dart';
 import 'package:digistall/screens/store_editor_screen.dart';
+import 'package:digistall/screens/store_formats_screen.dart';
 import 'package:digistall/screens/tools_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -55,7 +59,7 @@ void main() {
       'shopId': 'sharmasweets',
       'userStatus': 'COMPLETED',
       'orders': [
-        for (final (i, st) in ['PENDING', 'PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED'].indexed) ...[
+        for (final (i, st) in ['CONFIRMED', 'PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED'].indexed) ...[
           {
             'orderId': 'order-$i-7f3a9c',
             'shopId': 'sharmasweets',
@@ -131,8 +135,8 @@ void main() {
     });
   });
 
-  Future<void> shoot(WidgetTester tester, String name, Widget screen, {bool hindi = false}) async {
-    Session.instance.lang = hindi ? 'hi' : 'en';
+  Future<void> shoot(WidgetTester tester, String name, Widget screen, {bool hindi = false, String? lang}) async {
+    Session.instance.lang = lang ?? (hindi ? 'hi' : 'en');
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 2.625;
     addTearDown(tester.view.reset);
@@ -168,4 +172,21 @@ void main() {
   testWidgets('store editor', (t) => shoot(t, '11_editor', const StoreEditorScreen()));
   testWidgets('business cards', (t) => shoot(t, '12_cards', const BusinessCardsScreen()));
   testWidgets('profile', (t) => shoot(t, '13_profile', const ProfileScreen()));
+  testWidgets('low stock', (t) => shoot(t, '14_low_stock', const LowStockScreen()));
+  testWidgets('notifications', (t) async {
+    final o = Session.instance.orders.first;
+    await Inbox.instance.load('sharmasweets');
+    Inbox.instance.items = [
+      InboxItem(kind: SellerAlert.newOrder, title: 'New order #${o.shortId}', body: '3 items | ₹815 | Paid by UPI\nItems: 2 x Kaju Katli 500g, 1 x Rasgulla tin\nDeliver to: Merta City 341510', orderId: o.id, time: DateTime.now()),
+      InboxItem(kind: SellerAlert.riderOnTheWay, title: 'Rider on the way', body: 'Ravi will collect #${o.shortId}', orderId: o.id, time: DateTime.now().subtract(const Duration(minutes: 3))),
+      InboxItem(kind: SellerAlert.orderCollected, title: 'Order collected', body: '#${o.shortId} picked up by Ravi', orderId: o.id, time: DateTime.now().subtract(const Duration(minutes: 12)), read: true),
+      InboxItem(kind: SellerAlert.orderDelivered, title: 'Order delivered', body: '#${o.shortId} delivered successfully', orderId: o.id, time: DateTime.now().subtract(const Duration(hours: 2)), read: true),
+    ];
+    await shoot(t, '17_notifications', const NotificationsScreen());
+  });
+  testWidgets('store formats', (t) => shoot(t, '15_formats', const StoreFormatsScreen()));
+  testWidgets('onboarding in Bengali', (t) async {
+    await shoot(t, '16_onboarding_bn', const OnboardingScreen(), lang: 'bn');
+    expect(find.text('আপনার ডিজিটাল দোকান তৈরি করুন'), findsWidgets);
+  });
 }

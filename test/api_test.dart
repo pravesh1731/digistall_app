@@ -99,6 +99,37 @@ void main() {
     expect(r?['riderStatus'], 'En Route');
   });
 
+  test('Gotan listing uses PUT api/shop/editshop with formats', () async {
+    await withBackend(
+      () => Api.syncGotanShop(shopId: 's1', heading: 'Shop', desc: 'Merta', shopImage: '', formats: ['food-bakery']),
+      (_) => json({'success': true}),
+    );
+    expect(sent.single.method, 'PUT');
+    expect(sent.single.url.toString(), 'https://gotanbackend.digistall.in/api/shop/editshop');
+    expect(bodyOf(sent.single)['formats'], ['food-bakery']);
+    expect(bodyOf(sent.single)['shopId'], 's1');
+  });
+
+  test('shop rider trips and rider-trip cancel go to gotan', () async {
+    final trips = await withBackend(
+      () => Api.shopRiderTrips('s1'),
+      (_) => json({'success': true, 'shopOrderDetail': [{'orderId': 'o1', 'riderStatus': 'PICKED_UP'}]}),
+    );
+    expect(sent.single.url.toString(), 'https://gotanbackend.digistall.in/api/digiorder/shopdigiorder');
+    expect(bodyOf(sent.single), {'shopId': 's1'});
+    expect(trips.single['riderStatus'], 'PICKED_UP');
+
+    await withBackend(() => Api.cancelRiderTrip('65f0c0ffee', reason: 'Order cancelled by seller'), (_) => json({'success': true}));
+    expect(sent.single.url.path, '/api/digiorder/setorderStatus');
+    expect(bodyOf(sent.single), {'orderId': '65f0c0ffee', 'riderStatus': 'Cancelled', 'reason': 'Order cancelled by seller'});
+  });
+
+  test('AppSumo shop flag', () async {
+    await withBackend(() => Api.markAppSumoShop('s1'), (_) => json({'shopId': 's1'}, 201));
+    expect(sent.single.url.path, '/appsumo/shop');
+    expect(bodyOf(sent.single), {'shopId': 's1'});
+  });
+
   test('server errors surface the backend message', () async {
     expect(
       () => withBackend(() => Api.updateShop('s1', {}), (_) => json({'response': 'Some Thing Was Wrong'}, 400)),
