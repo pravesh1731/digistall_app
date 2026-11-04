@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-DigiStall seller app (Flutter, Android first; iOS config exists but has no `GoogleService-Info.plist`). It is the mobile version of the seller admin website admin.digistall.in (repo `Siyag-Rural-Market-Private-Limited/new-web`). It follows that site's mobile design (`src/new_theme.css` and the `New*` components) and its API calls. A seller signs in, claims `<subdomain>.digistall.in`, and then manages orders, catalogue, storefront look, bills and business cards. Customers use the storefront (repo `new-tem`). Package `digistall`; Android applicationId `com.digistall.digistall`.
+DigiStall seller app (Flutter, Android first; iOS config exists but has no `GoogleService-Info.plist`). It is the mobile version of the seller admin website admin.digistall.in (repo `Siyag-Rural-Market-Private-Limited/new-web`). It follows that site's mobile design (`src/new_theme.css` and the `New*` components) and its API calls. A seller signs in, claims `<subdomain>.digistall.in`, and then manages orders, catalogue, storefront look, bills and business cards. Customers use the storefront (repo `new-tem`). Package `digistall`; Android applicationId `com.digistall.digistall1`.
 
 ## Commands
 

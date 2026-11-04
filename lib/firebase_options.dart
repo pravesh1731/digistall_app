@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBY7tt7b-pMYVNt5erAjNcyZ9EmbI2vw_o',
-    appId: '1:43638107391:android:e4a505183dde496f0bf0ca',
+    appId: '1:43638107391:android:23c2b3615e9d71820bf0ca',
     messagingSenderId: '43638107391',
     projectId: 'humans-of-rural-india-d2b22',
     storageBucket: 'humans-of-rural-india-d2b22.appspot.com',
@@ -65,6 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'humans-of-rural-india-d2b22.appspot.com',
     androidClientId: '43638107391-0fdfvcqkvhv4h3kotk2rg37tu3ripmlp.apps.googleusercontent.com',
     iosClientId: '43638107391-f06943sj5i1cm5rk4mbsm0v097og42s6.apps.googleusercontent.com',
-    iosBundleId: 'com.digistall.digistall',
+    iosBundleId: 'com.digistall.digistall1',
   );
 }
