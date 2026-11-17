@@ -94,8 +94,10 @@ class Api {
   static Future<void> updateUserStatus(String userId, String status) =>
       post('user/userStatus', {'userId': userId, 'userStatus': status});
 
-  static Future<void> setDeviceToken(String shopId, String token) =>
-      post('user/setDeviceToken', {'shopId': shopId, 'deviceToken': token});
+  /// Saves the FCM token on the shop (`deviceToken`) and on the seller's user
+  /// record (`notificationToken`); hri-backend pushes seller alerts to both.
+  static Future<void> setDeviceToken(String shopId, String token, {String? userId}) =>
+      post('user/setDeviceToken', {'shopId': shopId, 'deviceToken': token, if (userId != null && userId.isNotEmpty) 'userId': userId});
 
   static Future<void> updateDefaultDeliveryDays(String shopId, int days) =>
       post('user/updatedefaultdeliverydate', {'shopId': shopId, 'defaultDeliveryDate': days});
@@ -103,6 +105,22 @@ class Api {
   /// Deletes the user, shop and subdomain records, and the Firebase account.
   static Future<void> deleteAccount(String shopId, String? firebaseId) =>
       post('user/deleteUserPermanently', {'shopId': shopId, if (firebaseId != null) 'firebaseId': firebaseId});
+
+  // -------------------------------------------------------- notifications
+
+  /// The seller's notifications (hri `/notifications`, newest first). Both
+  /// backends file seller alerts here with `recipientId` = shopId.
+  static Future<List<Map<String, dynamic>>> sellerNotifications(String shopId, {int limit = 50}) async {
+    final q = Uri(queryParameters: {'recipientId': shopId, 'role': 'seller', 'limit': '$limit'}).query;
+    final data = await _ok('GET', '${base}notifications?$q');
+    final list = data is Map ? data['notifications'] : null;
+    return list is List ? list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList() : [];
+  }
+
+  static Future<void> markNotificationRead(String id) => post('notifications/mark-read', {'id': id});
+
+  static Future<void> markAllNotificationsRead(String shopId) =>
+      post('notifications/mark-read', {'recipientId': shopId, 'role': 'seller'});
 
   // ----------------------------------------------------------- subdomains
 

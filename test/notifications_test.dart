@@ -151,4 +151,79 @@ void main() {
     expect(Session.instance.stageOf(o), 'accepted');
     Session.instance.riders = {};
   });
+
+  group('backend pushes (hri-backend / gotanbackend SELLER_* types)', () {
+    const id = 'a1b2c3d4-0000-4000-8000-0000gt1042';
+
+    test('both new-order pushes resolve to the same alert, so only one rings', () {
+      // digiuserController.sendMessageToAdmin
+      final a = NotificationService.fcmAlert({'type': 'SELLER_NEW_ORDER', 'orderId': id, 'tag': 'seller_order_$id'},
+          title: '🛒 New Order Received!', body: 'Ravi placed an order with 3 item(s) worth ₹450. Check your dashboard!');
+      // notificationService.sendInAppNotification
+      final b = NotificationService.fcmAlert({'type': 'SELLER_NEW_ORDER', 'entityId': id, 'tag': 'seller_$id'}, title: 'New Order', body: 'New order #$id received for 450.');
+      expect((a.$1, a.$2), (SellerAlert.newOrder, id));
+      expect((b.$1, b.$2), (SellerAlert.newOrder, id));
+      expect(a.$3, '🛒 New Order Received!');
+    });
+
+    test('rider and status updates never sound like a new order', () {
+      SellerAlert kind(String type) => NotificationService.fcmAlert({'type': type, 'entityId': id}).$1;
+      expect(kind('SELLER_RIDER_ASSIGNED'), SellerAlert.riderOnTheWay);
+      expect(kind('SELLER_RIDER_AT_SHOP'), SellerAlert.riderAtShop);
+      expect(kind('SELLER_ORDER_PICKED_UP'), SellerAlert.orderCollected);
+      expect(kind('SELLER_OUT_FOR_DELIVERY'), SellerAlert.outForDelivery);
+      expect(kind('SELLER_ORDER_DELIVERED'), SellerAlert.orderDelivered);
+      expect(kind('SELLER_ORDER_CANCELLED'), SellerAlert.orderCancelled);
+      expect(kind('SELLER_ORDER_EXPIRED'), SellerAlert.orderCancelled);
+      expect(kind('SELLER_DELIVERY_UNSUCCESSFUL'), SellerAlert.deliveryFailed);
+      expect(kind('SELLER_NO_RIDER_YET'), SellerAlert.stillLooking);
+      expect(kind('SELLER_ORDER_ACCEPTED'), SellerAlert.orderUpdate);
+      expect(kind('SOMETHING_NEW'), SellerAlert.orderUpdate);
+      expect([for (final t in sellerAlertTypes.keys) if (t != 'SELLER_NEW_ORDER' && t != 'new_order') kind(t)].where((k) => k.isLoud), isEmpty);
+      expect(NotificationService.orderIdOf({'entityId': id}), id);
+      expect(NotificationService.orderIdOf({'orderId': id, 'entityId': 'x'}), id);
+    });
+
+    test("the seller's own status changes are recognised", () async {
+      final prefs = await SharedPreferences.getInstance();
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_ORDER_DELIVERED', id), isFalse);
+      await n.markLocalChange(id, 'DELIVERED');
+      await n.markLocalChange(id, 'CONFIRMED');
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_ORDER_DELIVERED', id), isTrue);
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_ORDER_ACCEPTED', id), isTrue);
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_ORDER_CANCELLED', id), isFalse);
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_RIDER_ASSIGNED', id), isFalse, reason: 'only seller-made statuses');
+      expect(await NotificationService.isOwnAction(prefs, 'SELLER_ORDER_DELIVERED', 'other'), isFalse);
+    });
+
+    test('server notifications merge into the inbox without repeats', () async {
+      final inbox = Inbox.instance..reset();
+      final now = DateTime.now();
+      await inbox.add(shop, InboxItem(kind: SellerAlert.newOrder, title: 'New order', body: '', orderId: id, time: now));
+      Map<String, dynamic> srv(String sid, String type, {DateTime? at, bool read = false}) =>
+          {'_id': sid, 'type': type, 'title': type, 'message': 'm', 'entityId': id, 'isRead': read, 'createdAt': (at ?? now).toUtc().toIso8601String()};
+      final list = [
+        srv('n3', 'SELLER_ORDER_ACCEPTED'),
+        srv('n2', 'SELLER_RIDER_ASSIGNED', at: now.add(const Duration(minutes: 2))),
+        srv('n1', 'SELLER_NEW_ORDER'),
+        srv('n0', 'SELLER_ORDER_DELIVERED', at: now.subtract(const Duration(days: 3))),
+      ];
+      await inbox.mergeServer(shop, list, skip: (m) => m['_id'] == 'n3');
+      expect(inbox.items.map((i) => i.kind), [SellerAlert.riderOnTheWay, SellerAlert.newOrder, SellerAlert.orderDelivered]);
+      expect(inbox.items[1].serverId, 'n1', reason: 'linked to the alert the device raised itself');
+      expect(inbox.items.last.read, isTrue, reason: 'old notifications are not new');
+      expect(inbox.unread, 2);
+      await inbox.mergeServer(shop, list, skip: (m) => m['_id'] == 'n3');
+      expect(inbox.items, hasLength(3));
+      inbox.reset();
+    });
+  });
+
+  test('rider delivery fee follows the website rule', () {
+    expect(riderDeliveryFee(40, null, null, null, null), 40);
+    expect(riderDeliveryFee(0, null, null, 26.9, 73.9), 25);
+    expect(riderDeliveryFee(0, 26.0, 73.0, 26.0, 73.0), 20);
+    expect(riderDeliveryFee(0, 26.0, 73.0, 26.045, 73.0), 50); // ~5 km
+    expect(riderDeliveryFee(0, 26.0, 73.0, 26.3, 73.0), 150); // ~33 km
+  });
 }

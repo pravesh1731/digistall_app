@@ -3,6 +3,8 @@
 /// getters encode which field wins, in the same order the website uses.
 library;
 
+import 'dart:math' as math;
+
 Map<String, dynamic> _map(dynamic v) => v is Map<String, dynamic> ? v : (v is Map ? Map<String, dynamic>.from(v) : {});
 List<Map<String, dynamic>> _list(dynamic v) => v is List ? v.map(_map).toList() : [];
 String _str(dynamic v) => v == null ? '' : v.toString().trim();
@@ -342,3 +344,19 @@ String formatDateTime(DateTime? d) => d == null ? '' : '${formatDate(d)}, ${form
 
 /// yyyy-mm-dd, the format the website stores delivery dates in.
 String isoDay(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Delivery fee sent to Gotan with a rider request, the website's rule
+/// (`NewOrders.jsx`): the order's own fee when it has one, otherwise ₹10 per
+/// km between shop and customer (at least ₹20, ₹150 from 15 km), or ₹25 when
+/// either location is unknown.
+num riderDeliveryFee(num orderFee, double? shopLat, double? shopLng, double? custLat, double? custLng) {
+  if (orderFee > 0) return orderFee;
+  if (shopLat == null || shopLng == null || custLat == null || custLng == null) return 25;
+  const r = 6371.0;
+  double rad(double d) => d * math.pi / 180;
+  final dLat = rad(custLat - shopLat);
+  final dLon = rad(custLng - shopLng);
+  final a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(rad(shopLat)) * math.cos(rad(custLat)) * math.sin(dLon / 2) * math.sin(dLon / 2);
+  final km = r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  return km >= 15 ? 150 : math.max(20, (km * 10).round());
+}

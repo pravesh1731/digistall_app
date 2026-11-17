@@ -11,15 +11,14 @@ import 'screens/gate.dart';
 import 'services/notification_service.dart';
 
 /// Runs in a separate isolate when an FCM message arrives while the app is in
-/// the background or terminated. Messages with a `notification` block are
-/// displayed by the OS; data-only `new_order` messages need a local one.
+/// the background or terminated. hri-backend's seller pushes carry a
+/// `notification` block, which Android shows by itself in a generic style;
+/// this replaces it with the seller-alert style (loud, repeating S1 for new
+/// orders) and drops repeats and the seller's own actions.
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  if (message.notification == null && message.data['type'] == 'new_order') {
-    await NotificationService.instance.init();
-    await NotificationService.instance.showFromMessage(message);
-  }
+  await NotificationService.instance.handleBackgroundMessage(message);
 }
 
 Future<void> main() async {

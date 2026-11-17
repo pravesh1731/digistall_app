@@ -17,6 +17,9 @@ import '../widgets/ds.dart';
       SellerAlert.orderCancelled => (Icons.cancel_outlined, DS.red, const Color(0xFFFFEAEA)),
       SellerAlert.riderChanged => (Icons.swap_horiz, const Color(0xFFB54708), const Color(0xFFFFFAEB)),
       SellerAlert.stillLooking || SellerAlert.riderDelay => (Icons.hourglass_bottom, DS.tintYellowFg, DS.tintYellow),
+      SellerAlert.riderAtShop => (Icons.storefront_outlined, DS.teal, DS.tealSoft),
+      SellerAlert.deliveryFailed => (Icons.report_gmailerrorred_outlined, DS.red, const Color(0xFFFFEAEA)),
+      SellerAlert.orderUpdate => (Icons.info_outline, DS.muted, DS.paper),
     };
 
 String timeAgo(DateTime t) {
@@ -44,7 +47,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SessionA
   void initState() {
     super.initState();
     _inbox.addListener(_changed);
-    _inbox.load(Session.instance.shopId);
+    _inbox.load(Session.instance.shopId).then((_) => NotificationService.instance.syncInbox());
   }
 
   @override

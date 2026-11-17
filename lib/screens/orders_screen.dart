@@ -8,6 +8,7 @@ import '../core/actions.dart';
 import '../core/api.dart';
 import '../core/app_nav.dart';
 import '../core/models.dart';
+import '../core/order_status.dart';
 import '../core/session.dart';
 import '../core/theme.dart';
 import '../core/rider.dart';
@@ -316,7 +317,7 @@ class _OrderCardState extends State<OrderCard> {
 
   Future<void> _setStatus(String status, String nextTab, String message) => _run(status, () async {
         NotificationService.instance.markLocalChange(o.id, status);
-        await Api.changeOrderStatus(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: status, note: _note());
+        await changeOrderStatusChecked(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: status, note: _note());
         widget.onMoved(nextTab);
         return message;
       });
@@ -335,7 +336,7 @@ class _OrderCardState extends State<OrderCard> {
     if (!ok) return;
     await _run('CANCEL', () async {
       NotificationService.instance.markLocalChange(o.id, 'CANCEL');
-      await Api.changeOrderStatus(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: 'CANCEL');
+      await changeOrderStatusChecked(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, status: 'CANCEL');
       // Withdraw the delivery request so no rider goes to collect it.
       final tripId = '${_rider?['_id'] ?? ''}';
       if (tripId.isNotEmpty && !_riderCancelled) {
@@ -349,9 +350,12 @@ class _OrderCardState extends State<OrderCard> {
   }
 
   Future<void> _selfDeliver() => _run('SELF', () async {
-        await Api.selfDeliver(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id);
+        NotificationService.instance.markLocalChange(o.id, 'SHIPPED');
+        final emailed = await selfDeliverChecked(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id);
         widget.onMoved('shipped');
-        return tr('Self delivery started. The customer got a 4-digit OTP to give you at delivery.', 'स्वयं डिलीवरी शुरू। ग्राहक को 4 अंकों का OTP भेजा गया है।');
+        return emailed
+            ? tr('Self delivery started. The customer got a 4-digit OTP to give you at delivery.', 'स्वयं डिलीवरी शुरू। ग्राहक को 4 अंकों का OTP भेजा गया है।')
+            : tr('Self delivery started. The customer can see the 4-digit OTP on their DigiStall order page.', 'स्वयं डिलीवरी शुरू। ग्राहक अपने DigiStall ऑर्डर पेज पर 4 अंकों का OTP देख सकते हैं।');
       });
 
   Future<void> _verifyOtp() async {
@@ -383,7 +387,7 @@ class _OrderCardState extends State<OrderCard> {
     }
     await _run('OTP', () async {
       NotificationService.instance.markLocalChange(o.id, 'DELIVERED');
-      final ok = await Api.verifyDeliveryOtp(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, otp: otp);
+      final ok = await verifyDeliveryOtpChecked(email: o.email, shopId: o.shopId.isEmpty ? Session.instance.shopId : o.shopId, orderId: o.id, otp: otp);
       if (!ok) throw ApiException(tr('Wrong OTP. Please check with the customer.', 'OTP गलत है। ग्राहक से दोबारा पूछें।'));
       widget.onMoved('delivered');
       return tr('Delivery verified! Order completed.', 'डिलीवरी सत्यापित! ऑर्डर पूरा हुआ।');
@@ -432,7 +436,8 @@ class _OrderCardState extends State<OrderCard> {
       final date = _effectiveDate;
       final time = _effectiveTime;
       final shopId = o.shopId.isEmpty ? Session.instance.shopId : o.shopId;
-      await Api.changeOrderStatus(
+      NotificationService.instance.markLocalChange(o.id, 'CONFIRMED');
+      await changeOrderStatusChecked(
         email: o.email,
         shopId: shopId,
         orderId: o.id,
@@ -462,8 +467,8 @@ class _OrderCardState extends State<OrderCard> {
         'sellerLng': shopNow.pickupLng,
         'customerLat': custLat,
         'customerLng': custLng,
-        'platformFee': o.platformFee,
-        'deliveryFee': o.deliveryFee,
+        'platformFee': o.platformFee > 0 ? o.platformFee : 5,
+        'deliveryFee': riderDeliveryFee(o.deliveryFee, shopNow.pickupLat, shopNow.pickupLng, custLat, custLng),
         'otp': otp,
       });
       _partner.text = 'Gotan Rider';

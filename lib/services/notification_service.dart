@@ -24,14 +24,23 @@ import '../core/session.dart';
 /// * Customer cancelled, rider dropped out, rider delay: push;
 ///   still looking for a rider (3 min): in-app.
 ///
-/// Neither backend pushes these events to sellers today (hri-backend sends its
-/// new-order push to the token the storefront supplies, and gotanbackend sends
-/// nothing on rider updates). So while the app is alive we poll every
-/// [pollEvery]: the seller record (`user/getuser`) for orders, and the shop's
-/// rider trips (gotan `api/digiorder/shopdigiorder`), and raise each alert
-/// once when its state changes. FCM data messages with the same `type`s are
-/// also shown (foreground and background), so backend pushes work as soon as
-/// the backend sends them.
+/// Sources, all deduplicated per (kind, order) through `notif_shown`:
+///
+/// * FCM pushes from hri-backend to `Shop.deviceToken` / the user's
+///   `notificationToken` (`data.type` = `SELLER_*`, order id in `orderId` or
+///   `entityId`). gotanbackend's rider events reach the seller the same way
+///   (it forwards them to hri). They arrive with a `notification` block, so
+///   Android shows them itself when the app is in the background; the
+///   background handler swaps that for the app's own style (loud S1, quiet
+///   updates, nothing for in-app kinds).
+/// * Polling every [pollEvery] while the app is alive: `user/getuser` for
+///   orders and gotan `api/digiorder/shopdigiorder` for rider trips, raising
+///   an alert once per state change (covers anything the pushes miss).
+/// * hri `/notifications` (the seller's stored notifications), merged into
+///   the [Inbox] so alerts from while the phone was off still show up.
+///
+/// hri-backend also notifies the seller about their own status changes; those
+/// are skipped when the change was made on this device ([markLocalChange]).
 class NotificationService with WidgetsBindingObserver {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -64,16 +73,34 @@ class NotificationService with WidgetsBindingObserver {
     if (_ready) return;
     _ready = true;
     try {
-      await _local.initialize(
-        const InitializationSettings(
-          android: AndroidInitializationSettings('@drawable/ic_notification'),
-          iOS: DarwinInitializationSettings(),
-        ),
-        onDidReceiveNotificationResponse: (r) => _openFromPayload(r.payload),
-      );
-      final android = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      await android?.deleteNotificationChannel('new_orders_channel'); // replaced by the two below
-      await android?.createNotificationChannel(const AndroidNotificationChannel(
+      await _initLocal();
+      WidgetsBinding.instance.addObserver(this);
+      FirebaseMessaging.onMessage.listen((m) {
+        showFromMessage(m);
+        _checkNow();
+        syncInbox();
+      });
+      FirebaseMessaging.onMessageOpenedApp.listen((m) => _open(orderIdOf(m.data)));
+    } catch (e) {
+      debugPrint('Notification init failed: $e');
+    }
+  }
+
+  bool _localReady = false;
+
+  /// The local-notification plugin and channels only (also used by the
+  /// background isolate, which has no widgets binding).
+  Future<void> _initLocal() async {
+    if (_localReady) return;
+    _localReady = true;
+    await _local.initialize(
+      const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_notification'), iOS: DarwinInitializationSettings()),
+      onDidReceiveNotificationResponse: (r) => _openFromPayload(r.payload),
+    );
+    final android = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.deleteNotificationChannel('new_orders_channel'); // replaced by the two below
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
         loudChannel,
         'New orders',
         description: 'Loud alert that rings until you open the new order',
@@ -82,29 +109,20 @@ class NotificationService with WidgetsBindingObserver {
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: true,
         enableLights: true,
-      ));
-      await android?.createNotificationChannel(const AndroidNotificationChannel(
-        updatesChannel,
-        'Order updates',
-        description: 'Rider on the way, order delivered, cancellations',
-        importance: Importance.high,
-      ));
-
-      WidgetsBinding.instance.addObserver(this);
-      FirebaseMessaging.onMessage.listen((m) {
-        showFromMessage(m);
-        _checkNow();
-      });
-      FirebaseMessaging.onMessageOpenedApp.listen((m) => _open(m.data['orderId']?.toString()));
-    } catch (e) {
-      debugPrint('Notification init failed: $e');
-    }
+      ),
+    );
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(updatesChannel, 'Order updates', description: 'Rider on the way, order delivered, cancellations', importance: Importance.high),
+    );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    if (_foreground) _checkNow();
+    if (_foreground) {
+      _checkNow();
+      syncInbox();
+    }
   }
 
   /// Asks for permission (Android 13+ / iOS). Safe to call repeatedly.
@@ -120,7 +138,7 @@ class NotificationService with WidgetsBindingObserver {
     try {
       final initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial != null) {
-        _open(initial.data['orderId']?.toString());
+        _open(orderIdOf(initial.data));
         return;
       }
       final details = await _local.getNotificationAppLaunchDetails();
@@ -149,9 +167,64 @@ class NotificationService with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  static const _localKey = 'notif_local';
+  static const _ownWindow = Duration(hours: 24);
+
   /// Record that this device is changing [orderId] to [status] so no alert is
-  /// raised for it.
-  void markLocalChange(String orderId, String status) => _localChanges.add('$orderId:${status.toUpperCase()}');
+  /// raised for it (by polling, by the backend's push, or in the inbox).
+  Future<void> markLocalChange(String orderId, String status) async {
+    final st = _normStatus(status);
+    _localChanges.add('$orderId:$st');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final keep = (prefs.getStringList(_localKey) ?? []).where((e) => now - (int.tryParse(e.split('|').last) ?? 0) < _ownWindow.inMilliseconds).toList();
+      keep.add('$orderId|$st|$now');
+      await prefs.setStringList(_localKey, keep.length > 200 ? keep.sublist(keep.length - 200) : keep);
+    } catch (_) {}
+  }
+
+  static String _normStatus(String s) {
+    final u = s.toUpperCase();
+    return u == 'CANCELLED' ? 'CANCEL' : u;
+  }
+
+  /// Whether this device set [orderId] to [status] in the last 24 hours.
+  static Future<bool> isOwnChange(SharedPreferences prefs, String orderId, String status) async {
+    await prefs.reload();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final st = _normStatus(status);
+    return (prefs.getStringList(_localKey) ?? []).any((e) {
+      final p = e.split('|');
+      return p.length == 3 && p[0] == orderId && p[1] == st && now - (int.tryParse(p[2]) ?? 0) < _ownWindow.inMilliseconds;
+    });
+  }
+
+  /// Whether a backend notification (`type` + order) reports something this
+  /// device did itself.
+  static Future<bool> isOwnAction(SharedPreferences prefs, String? type, String orderId) async {
+    final st = ownActionStatus[type ?? ''];
+    if (st == null || orderId.isEmpty) return false;
+    return isOwnChange(prefs, orderId, st);
+  }
+
+  /// Fetches the seller's stored notifications from hri-backend and merges
+  /// them into the [Inbox].
+  Future<void> syncInbox() async {
+    final shopId = _pollingShop ?? Session.instance.shopId;
+    if (shopId.isEmpty || dryRun) return;
+    try {
+      final list = await Api.sellerNotifications(shopId);
+      final prefs = await SharedPreferences.getInstance();
+      final own = <String>{};
+      for (final n in list) {
+        if (await isOwnAction(prefs, '${n['type']}', '${n['entityId'] ?? ''}')) own.add('${n['_id']}');
+      }
+      await Inbox.instance.mergeServer(shopId, list, skip: (n) => own.contains('${n['_id']}'));
+    } catch (_) {
+      // Offline or older backend; the device's own inbox still works.
+    }
+  }
 
   /// Saves this device's FCM token on the shop and subscribes to its topic.
   Future<void> registerShop(String shopId) async {
@@ -159,10 +232,11 @@ class NotificationService with WidgetsBindingObserver {
     try {
       final fm = FirebaseMessaging.instance;
       final token = await fm.getToken();
-      if (token != null) await Api.setDeviceToken(shopId, token);
+      final userId = Session.instance.userId;
+      if (token != null) await Api.setDeviceToken(shopId, token, userId: userId);
       await fm.subscribeToTopic('shop_$shopId');
       await _tokenSub?.cancel();
-      _tokenSub = fm.onTokenRefresh.listen((t) => Api.setDeviceToken(shopId, t).catchError((_) {}));
+      _tokenSub = fm.onTokenRefresh.listen((t) => Api.setDeviceToken(shopId, t, userId: userId).catchError((_) {}));
     } catch (e) {
       debugPrint('FCM registration failed: $e');
     }
@@ -184,8 +258,13 @@ class NotificationService with WidgetsBindingObserver {
     stopPolling();
     _pollingShop = shopId;
     Inbox.instance.load(shopId);
-    _timer = Timer.periodic(pollEvery, (_) => _checkNow());
+    var tick = 0;
+    _timer = Timer.periodic(pollEvery, (_) {
+      _checkNow();
+      if (++tick % 3 == 0 && _foreground) syncInbox();
+    });
     _checkNow();
+    syncInbox();
   }
 
   void stopPolling() {
@@ -356,6 +435,12 @@ class NotificationService with WidgetsBindingObserver {
         return (tr('Still looking for a rider', 'अभी राइडर ढूँढ रहे हैं'), tr('No rider has accepted $n yet', '$n अभी तक किसी राइडर ने नहीं लिया'), null);
       case SellerAlert.riderDelay:
         return (tr('Rider delay', 'राइडर में देरी'), tr('No rider available yet for $n. We are still trying.', '$n के लिए अभी कोई राइडर नहीं मिला। हम कोशिश कर रहे हैं।'), null);
+      case SellerAlert.riderAtShop:
+        return (tr('Rider at your shop', 'राइडर दुकान पर'), tr('$rider has arrived to collect $n', '$rider $n लेने पहुँच गए हैं'), null);
+      case SellerAlert.deliveryFailed:
+        return (tr('Delivery unsuccessful', 'डिलीवरी नहीं हो सकी'), tr('The rider could not deliver $n', 'राइडर $n नहीं पहुँचा सके'), null);
+      case SellerAlert.orderUpdate:
+        return (tr('Order update', 'ऑर्डर अपडेट'), tr('$n was updated', '$n अपडेट हुआ'), null);
     }
   }
 
@@ -365,9 +450,9 @@ class NotificationService with WidgetsBindingObserver {
     final item = InboxItem(kind: kind, title: title, body: details ?? body, orderId: o.id, time: DateTime.now());
     await Inbox.instance.add(shopId, item);
     // A push for this event may already have arrived via FCM.
-    final alreadyShown = await _alreadyShown(prefs, kind, o.id);
+    if (await _alreadyShown(prefs, kind, o.id)) return;
     if (kind.isPush) {
-      if (!alreadyShown) await _showSystem(kind, o.id, title, body, details);
+      await _showSystem(kind, o.id, title, body, details);
     } else if (_foreground) {
       onInApp?.call(item);
     }
@@ -420,39 +505,95 @@ class NotificationService with WidgetsBindingObserver {
 
   // ------------------------------------------------------------------ FCM
 
-  /// FCM `data.type` values this app understands (for backend pushes).
-  static const fcmTypes = {
-    'new_order': SellerAlert.newOrder,
-    'rider_assigned': SellerAlert.riderOnTheWay,
-    'rider_on_the_way': SellerAlert.riderOnTheWay,
-    'order_picked': SellerAlert.orderCollected,
-    'out_for_delivery': SellerAlert.outForDelivery,
-    'order_delivered': SellerAlert.orderDelivered,
-    'order_cancelled': SellerAlert.orderCancelled,
-    'rider_changed': SellerAlert.riderChanged,
-  };
+  /// The order an FCM message is about (hri's new-order push sends
+  /// `orderId`; the notification service sends `entityId`).
+  static String? orderIdOf(Map<String, dynamic> data) {
+    for (final k in ['orderId', 'entityId']) {
+      final v = '${data[k] ?? ''}'.trim();
+      if (v.isNotEmpty) return v;
+    }
+    return null;
+  }
 
-  /// Shows an FCM message (foreground, or from the background isolate).
-  /// Data-only messages are rendered with the seller-alert styles; an order
-  /// alert shown here isn't shown again when polling notices the same event.
-  Future<void> showFromMessage(RemoteMessage m) async {
-    final kind = fcmTypes[m.data['type']] ?? SellerAlert.newOrder;
-    final orderId = '${m.data['orderId'] ?? ''}';
-    var title = m.notification?.title;
-    var body = m.notification?.body;
+  /// How an FCM message should be shown: alert kind, order, title, short body
+  /// and (for new orders) expanded details. Public for tests.
+  @visibleForTesting
+  static (SellerAlert, String, String, String, String?) fcmAlert(Map<String, dynamic> data, {String? title, String? body}) {
+    final kind = sellerAlertFor('${data['type'] ?? ''}');
+    final orderId = orderIdOf(data) ?? '';
+    final short = orderId.length > 8 ? orderId.substring(orderId.length - 8).toUpperCase() : orderId.toUpperCase();
+    var t = title ?? (data['title'] as String?);
+    var b = body ?? (data['body'] as String?);
     String? details;
-    if (kind == SellerAlert.newOrder && title == null) {
-      title = orderId.isEmpty ? 'New order received' : 'New order #${orderId.length > 8 ? orderId.substring(orderId.length - 8).toUpperCase() : orderId}';
-      final parts = [m.data['customerName'], m.data['productName'], if (m.data['amount'] != null) '₹${m.data['amount']}'];
-      body = parts.whereType<String>().where((s) => s.isNotEmpty).join(' | ');
-      details = body;
+    if (kind == SellerAlert.newOrder) {
+      if (t == null || t.isEmpty) t = orderId.isEmpty ? tr('New order received', 'नया ऑर्डर आया') : tr('New order #$short', 'नया ऑर्डर #$short');
+      if (b == null || b.isEmpty) {
+        final parts = [data['customerName'], data['productName'], if (data['amount'] != null) '₹${data['amount']}'];
+        b = parts.whereType<String>().where((s) => s.isNotEmpty).join(' | ');
+      }
+      details = b;
     }
+    return (kind, orderId, (t == null || t.isEmpty) ? 'DigiStall' : t, b ?? '', details);
+  }
+
+  /// Shows an FCM message (foreground, or from the background isolate) in the
+  /// seller-alert style. Repeats of an alert already shown (hri sends two
+  /// pushes per new order, and polling may have seen it first) and reports of
+  /// the seller's own actions are dropped.
+  Future<void> showFromMessage(RemoteMessage m, {bool background = false}) async {
+    final (kind, orderId, title, body, details) = fcmAlert(m.data, title: m.notification?.title, body: m.notification?.body);
+    final prefs = await SharedPreferences.getInstance();
+    var show = true;
     if (orderId.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      if (await _alreadyShown(prefs, kind, orderId)) return;
+      if (await isOwnAction(prefs, '${m.data['type']}', orderId)) {
+        show = false;
+      } else if (await _alreadyShown(prefs, kind, orderId)) {
+        show = false;
+      }
     }
-    if (!kind.isPush && _foreground) return; // in-app kinds surface through polling
-    await _showSystem(kind, orderId.isEmpty ? '${DateTime.now().millisecondsSinceEpoch}' : orderId, title ?? 'DigiStall', body ?? '', details);
+    if (show) {
+      final id = orderId.isEmpty ? '${DateTime.now().millisecondsSinceEpoch}' : orderId;
+      if (kind.isPush) {
+        await _showSystem(kind, id, title, body, details);
+      } else if (!background && _foreground) {
+        onInApp?.call(InboxItem(kind: kind, title: title, body: body, orderId: orderId, time: DateTime.now()));
+      }
+    }
+    // In the background Android has already shown the backend's own copy
+    // (default channel, generic style). Remove it: ours replaces it, and
+    // repeats, own actions and in-app kinds shouldn't be in the shade.
+    if (background && m.notification != null) await _removeSystemCopy(m);
+  }
+
+  /// Entry point for `FirebaseMessaging.onBackgroundMessage`.
+  Future<void> handleBackgroundMessage(RemoteMessage m) async {
+    _foreground = false;
+    try {
+      await _initLocal();
+      await showFromMessage(m, background: true);
+    } catch (e) {
+      debugPrint('Background notification failed: $e');
+    }
+  }
+
+  /// FCM posts a notification message with id 0 and the message's Android
+  /// tag (hri sends it as `data.tag` too). It may appear just after this
+  /// handler starts, so look for it for a couple of seconds.
+  Future<void> _removeSystemCopy(RemoteMessage m) async {
+    final tag = '${m.data['tag'] ?? ''}';
+    if (tag.isEmpty || defaultTargetPlatform != TargetPlatform.android) return;
+    for (var i = 0; i < 10; i++) {
+      try {
+        final active = await _local.getActiveNotifications();
+        if (active.any((n) => n.tag == tag)) {
+          await _local.cancel(0, tag: tag);
+          return;
+        }
+      } catch (_) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
   }
 
   // ---------------------------------------------------------------- tests
